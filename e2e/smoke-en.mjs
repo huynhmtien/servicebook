@@ -44,7 +44,7 @@ const rule = (name) => page.locator(".rule").filter({ has: page.getByText(name, 
 check("Diesel: spark plugs not tracked by default", !(await rule("Spark plugs").locator("input[type=checkbox]").isChecked()));
 check("Diesel: fuel filter tracked", await rule("Fuel filter").locator("input[type=checkbox]").isChecked());
 check("Default interval converted to miles (5,000 km → 3,000 mi)", (await rule("Engine oil").innerText()).replace(/\s+/g, " ").includes("3,000 mi"), await rule("Engine oil").innerText());
-check("Default interval source label in English", (await txt("body")).includes("Generic default · unverified"));
+check("Defaults are explained once in English (no per-row default badge)", (await txt("body")).includes("generic default intervals · unverified") && !(await txt("body")).includes("Generic default · unverified"), (await txt("#intervals")).slice(0, 200));
 
 // 2b. Reply via Telegram to update ODO (webhook)
 const MOCK = process.env.MOCK || "http://localhost:5599";

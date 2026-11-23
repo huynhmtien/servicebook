@@ -67,7 +67,7 @@ export default function RecordItems({ parts, initial, blank, money: m0 = {} }: {
           <div className="item" key={r.key}>
             <div className="full row" style={{ justifyContent: "space-between", flexWrap: "nowrap" }}>
               <label htmlFor={`name_${i}`} style={{ margin: 0 }}>{t("items.item_n", { n: i + 1 })}</label>
-              <button type="button" className="danger" style={{ minHeight: 36, padding: "4px 12px" }}
+              <button type="button" className="danger" style={{ minHeight: 44, padding: "4px 14px" }}
                 onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} aria-label={t("items.remove_aria", { n: i + 1 })}>
                 {t("items.remove")}
               </button>

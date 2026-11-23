@@ -13,8 +13,9 @@ import { researchProviders } from "../../../lib/intervals.ts";
 export const maxDuration = 60;
 
 function SourceTag({ r, t }: { r: { source: string; sourceUrl: string | null; sourceNote: string | null }; t: T }) {
-  const tag = r.source === "doc" ? { c: "b-ok", l: t("src.doc") } : r.source === "user" ? { c: "b-ok", l: t("src.user") }
-    : r.source === "ai" ? { c: "b-info", l: t("src.ai") } : { c: "b-unknown", l: t("src.default") };
+  // generic defaults are explained once in the "Where do the intervals come from?" card; only verified/chosen sources get a badge
+  if (r.source === "default") return null;
+  const tag = r.source === "doc" ? { c: "b-ok", l: t("src.doc") } : r.source === "user" ? { c: "b-ok", l: t("src.user") } : { c: "b-info", l: t("src.ai") };
   return (
     <span className="row" style={{ gap: 6 }}>
       <span className={`badge ${tag.c}`}>{tag.l}</span>
@@ -37,7 +38,7 @@ export default async function VehiclePage({ params, searchParams }: { params: Pr
   const desc = [v.model, v.year].filter(Boolean).join(" ") || t("veh.research_desc_fallback");
   return (
     <>
-      <p className="sub"><Link href="/vehicles">{t("veh.back")}</Link></p>
+      <p className="sub"><Link href="/vehicles" className="back">{t("veh.back")}</Link></p>
       <h1>{v.name}</h1>
       <p className="sub">{[v.plate, v.model, v.year].filter(Boolean).join(" · ")}</p>
       <Flash text={error} />
@@ -95,7 +96,7 @@ export default async function VehiclePage({ params, searchParams }: { params: Pr
                 <div><div style={{ fontWeight: 600 }}>{name}</div>
                   <div className="mute">{r.last ? `${r.last.odo != null ? t("veh.last_replaced_odo", { date: fmt.date(r.last.date), odo: fmt.dist(r.last.odo) }) : t("veh.last_replaced", { date: fmt.date(r.last.date) })}${r.last.garage ? t("veh.last_replaced_garage", { garage: r.last.garage }) : ""}` : t("veh.no_replacement")}
                     {r.status !== "unknown" && ` · ${describe(r, t, fmt)}`}</div>
-                  {(r.intervalKm != null || r.intervalMonths != null) && <div style={{ marginTop: 4 }}><SourceTag r={r} t={t} /></div>}</div>
+                  {r.source !== "default" && (r.intervalKm != null || r.intervalMonths != null) && <div style={{ marginTop: 4 }}><SourceTag r={r} t={t} /></div>}</div>
                 {r.intervalKm == null && r.intervalMonths == null ? <span className="badge b-unknown">{t("veh.no_interval")}</span> : <Badge s={r.status} t={t} />}
                 <details className="iv-box">
                   <summary className="mute">{t("veh.interval_summary", { value: ivText })}</summary>

@@ -43,7 +43,7 @@ export default async function Setup({ params, searchParams }: { params: Promise<
           </div>
         ))}
         <button className="btn primary block">{t("common.save")}</button>
-        <p style={{ textAlign: "center" }}><Link href={`/vehicles/${id}`}>{t("setup.skip")}</Link></p>
+        <p style={{ textAlign: "center" }}><Link href={`/vehicles/${id}`} className="back">{t("setup.skip")}</Link></p>
       </form>
     </>
   );

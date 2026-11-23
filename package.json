@@ -14,7 +14,8 @@
     "release": "node scripts/deploy.mjs",
     "db:migrate": "node scripts/deploy.mjs migrate",
     "db:migrate:local": "wrangler d1 migrations apply servicebook --local",
-    "e2e": "node e2e/run.mjs"
+    "e2e": "node e2e/run.mjs",
+    "audit:ui": "node e2e/ui-audit.mjs"
   },
   "engines": {
     "node": ">=22"
@@ -29,6 +30,7 @@
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "axe-core": "^4.14.1",
     "typescript": "^5.9.3",
     "wrangler": "^4.166.0"
   }

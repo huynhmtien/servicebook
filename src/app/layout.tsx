@@ -34,8 +34,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       </head>
       <body>
         <I18nProvider lang={lang} messages={LANGS[lang].dict} fmtOptions={{ locale: fmt.locale, currency: fmt.currency, distance: fmt.unit, taxLabel: fmt.taxLabel }}>
+          <a className="skip" href="#main">{t("a11y.skip")}</a>
           <div className="app">
-            <main>{children}</main>
+            <main id="main" tabIndex={-1}>{children}</main>
             <TabBar />
           </div>
         </I18nProvider>

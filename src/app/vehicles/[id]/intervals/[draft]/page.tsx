@@ -22,7 +22,7 @@ export default async function IntervalReview({ params }: { params: Promise<{ id:
     "SELECT part_type_id, interval_km, interval_months, source FROM rules WHERE vehicle_id = ?", vid)).map((x) => [x.part_type_id, x]));
   return (
     <>
-      <p className="sub"><Link href={`/vehicles/${vid}#intervals`}>{t("iv.back")}</Link></p>
+      <p className="sub"><Link href={`/vehicles/${vid}#intervals`} className="back">{t("iv.back")}</Link></p>
       <h1>{t("iv.title")}</h1>
       <p className="sub">{p.origin === "doc" ? t("iv.from_doc") : p.vehicle_desc ? t("iv.from_ai_for", { desc: p.vehicle_desc }) : `${t("iv.from_ai")}.`}{t("iv.only_checked")}</p>
       <Flash text={t("iv.warning")} />

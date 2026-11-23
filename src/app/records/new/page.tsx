@@ -21,7 +21,7 @@ export default async function NewRecord({ searchParams }: { searchParams: Promis
       <>
         <h1>{t("rec.manual_title")}</h1>
         <Flash text={error} />
-        <p className="sub"><Link href="/records/new">{t("rec.back_scan")}</Link></p>
+        <p className="sub"><Link href="/records/new" className="back">{t("rec.back_scan")}</Link></p>
         <RecordForm d={{ date: today() }} blank={3} />
       </>
     );

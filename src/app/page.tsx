@@ -62,7 +62,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <div className="steps" style={{ marginTop: 12 }}>
             {steps.map((s, i) => (
               <div key={i} className={`step${s.done ? " done" : ""}`}>
-                <span className="n">{s.done ? <Icon n="check" s={16} /> : i + 1}</span>
+                <span className="n">{s.done ? <><Icon n="check" s={16} /><span className="sr-only">{t("common.done")}: </span></> : i + 1}</span>
                 {s.done ? <span className="t">{s.t}</span> : <Link href={s.href} className="t">{s.t}</Link>}
               </div>
             ))}

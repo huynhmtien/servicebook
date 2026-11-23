@@ -175,7 +175,7 @@ check("Ô tích chọn hiển thị đúng cỡ (không bị kéo giãn)", cbw >
 await clickWait("button:has-text('Áp dụng các dòng đã chọn')", "Đã áp dụng chu kỳ cho 2");
 check("Áp dụng → báo số linh kiện đã cập nhật", (await flashes()).includes("cho 2 linh kiện"), await flashes());
 check("Dầu động cơ nay hiện nhãn 'AI tra cứu' + chu kỳ 10.000 km", (await ruleTxt("Dầu động cơ")).includes("AI tra cứu") && (await ruleTxt("Dầu động cơ")).includes("10.000 km"), await ruleTxt("Dầu động cơ"));
-check("Bugi (không tích) vẫn là mặc định chung", (await ruleTxt("Bugi")).includes("Mặc định chung"));
+check("Bugi (không tích) vẫn là mặc định chung: không có nhãn nguồn (AI/sổ/bạn tự đặt)", !/Theo sổ hướng dẫn|AI tra cứu|Bạn tự đặt/.test(await ruleTxt("Bugi")), await ruleTxt("Bugi"));
 await page.setInputFiles("#doc_file", path.resolve("public/icon-192.png"));
 await page.click("button:has-text('Đọc bảng bảo dưỡng')"); await page.waitForURL(/\/intervals\/\d+/, { timeout: 60000 });
 check("Quét bảng trong sổ hướng dẫn → màn hình duyệt (2 dòng)", (await page.locator(".item").count()) === 2 && (await txt("body")).includes("Đọc từ bảng bảo dưỡng"));

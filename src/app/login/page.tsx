@@ -1,5 +1,6 @@
 import Icon from "../components/Icon";
 import { login } from "../actions";
+import PasswordField from "../components/PasswordField";
 import { getI18n } from "../../lib/settings.ts";
 
 export default async function Login({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
@@ -18,7 +19,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
       <form action={login} className="card">
         <input type="hidden" name="next" value={next ?? "/"} />
         <label htmlFor="password">{t("login.password")}</label>
-        <input id="password" name="password" type="password" autoComplete="current-password" required autoFocus style={{ width: "100%" }} />
+        <PasswordField id="password" name="password" autoFocus />
         <button className="btn primary block" type="submit" style={{ marginTop: 14 }}>{t("login.submit")}</button>
       </form>
     </div>

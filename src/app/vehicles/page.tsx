@@ -37,7 +37,7 @@ export default async function Vehicles({ searchParams }: { searchParams: Promise
           </select></div>
         <button className="btn primary" type="submit">{t("veh.submit")}</button>
       </form>
-      <p><Link href="/settings">{t("veh.settings_link")}</Link></p>
+      <p><Link href="/settings" className="btn ghost block">{t("veh.settings_link")}</Link></p>
     </>
   );
 }

@@ -37,5 +37,5 @@ export function AlertItem({ r, vehicle, t, fmt, partName }: { r: RuleRow; vehicl
 }
 
 export function Flash({ text, ok }: { text?: string; ok?: boolean }) {
-  return text ? <div className={`flash${ok ? " ok" : ""}`} role="status">{text}</div> : null;
+  return text ? <div className={`flash${ok ? " ok" : ""}`} role={ok ? "status" : "alert"}>{text}</div> : null;
 }

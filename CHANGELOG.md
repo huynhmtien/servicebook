@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.0 — 2026-11-23
+- **UI/UX and accessibility pass** (login to every screen, light and dark, phone and desktop): axe-core WCAG 2.2 AA violations went from dozens to zero on 36 page/theme/viewport combinations.
+  - Contrast: separate button-fill and text/icon accent colors (≥ 4.5:1 in both themes); active tab label readable; native controls follow the theme (`color-scheme`).
+  - Touch targets ≥ 44px for back links, interval rows, remove buttons and segmented controls; tab labels 11px; links inside running text are underlined.
+  - Login: show/hide password toggle (paste and password managers stay enabled). Skip-to-content link; error notices are announced (`role="alert"`); completed checklist steps are readable by screen readers (no more strike-through).
+  - Vehicle page: the repeated "generic default" badge on every part is gone (explained once; only AI / manual / user-set intervals are labeled). Consistent file-input styling. Wider column on desktop.
+- `npm run audit:ui` (e2e/ui-audit.mjs): screenshots + axe + touch-target and overflow checks for every screen.
+
 ## 1.2.0 — 2026-11-23
 - **API keys entered in the app**: Settings → *Integrations & API keys* (Gemini / Anthropic / DeepSeek, Telegram token + chat id). Stored AES-GCM-encrypted in D1 (key derived from `SESSION_SECRET`), shown only as a masked tail, validated before saving, and only allowed when the app is password-protected. A Worker secret still takes priority (migration 0006).
 - Quick-start checklist now includes adding an AI key.

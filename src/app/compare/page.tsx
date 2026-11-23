@@ -107,7 +107,7 @@ export default async function Compare({ searchParams }: { searchParams: Promise<
 
   return (
     <>
-      <p className="sub"><Link href="/compare">{t("cmp.all_parts")}</Link></p>
+      <p className="sub"><Link href="/compare" className="back">{t("cmp.all_parts")}</Link></p>
       <h1>{name}</h1>
       <div className="seg" role="group" aria-label={t("cmp.kind_aria")} style={{ margin: "8px 0 16px" }}>
         {kinds.map(([k, l]) => <Link key={k} href={`/compare?part=${pid}&kind=${k}`} aria-current={kind === k}>{l}</Link>)}
