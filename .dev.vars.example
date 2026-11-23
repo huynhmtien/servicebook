@@ -1,0 +1,22 @@
+# Sao chép thành .dev.vars khi chạy thử trên máy (npm run preview). Khi chạy thật: dùng `wrangler secret put TÊN` hoặc --secrets-file.
+
+# Đăng nhập (bật cả hai; thiếu SESSION_SECRET thì app từ chối mọi truy cập)
+APP_PASSWORD=
+SESSION_SECRET=      # chuỗi ngẫu nhiên dài: openssl rand -hex 32
+
+# Cron nhắc việc hằng ngày (chuỗi ngẫu nhiên: openssl rand -hex 24)
+CRON_SECRET=
+
+# Quét phiếu bằng AI: chỉ cần MỘT khóa. Nhiều khóa thì đặt AI_PROVIDER=gemini|claude|deepseek
+GEMINI_API_KEY=
+ANTHROPIC_API_KEY=
+DEEPSEEK_API_KEY=
+AI_PROVIDER=
+# Tùy chọn đổi model: GEMINI_MODEL, DEEPSEEK_MODEL, CLAUDE_MODEL
+
+# Nhắc việc qua Telegram: tạo bot với @BotFather lấy token; lấy chat id bằng @userinfobot
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+
+# Múi giờ (mặc định Asia/Ho_Chi_Minh)
+APP_TZ=

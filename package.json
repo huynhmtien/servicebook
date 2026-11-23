@@ -1,0 +1,36 @@
+{
+  "name": "servicebook",
+  "version": "1.0.0",
+  "description": "ServiceBook — sổ bảo dưỡng ô tô: nhắc hạn theo km/thời gian, quét phiếu bằng AI, so sánh giá. Chạy trên Cloudflare Workers + D1.",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "test": "node --experimental-strip-types --test src/lib/*.test.ts",
+    "types": "wrangler types --env-interface CloudflareEnv",
+    "cf:build": "opennextjs-cloudflare build",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "release": "node scripts/deploy.mjs",
+    "db:migrate": "node scripts/deploy.mjs migrate",
+    "db:migrate:local": "wrangler d1 migrations apply servicebook --local",
+    "gen:seed": "node --experimental-strip-types --no-warnings scripts/gen-seed.ts",
+    "e2e": "node e2e/run.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@opennextjs/cloudflare": "^1.20.18",
+    "next": "^15.5.27",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.166.0"
+  }
+}

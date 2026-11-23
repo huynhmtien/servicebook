@@ -1,0 +1,14 @@
+node_modules
+.next
+.open-next
+.wrangler
+.dev.vars
+.env
+*.tsbuildinfo
+next-env.d.ts
+worker-configuration.d.ts
+secrets*.env
+*.env
+.env.*
+!.dev.vars.example
+wrangler.deploy.jsonc

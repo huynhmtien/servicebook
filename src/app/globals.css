@@ -1,0 +1,133 @@
+:root{
+  /* Bảng màu theo iOS (System Colors / Grouped Background) */
+  --outer:#e5e5ea;--bg:#f2f2f7;--surface:#fff;--text:#000;--mute:#6c6c70;--line:#d1d1d6;--line2:#c7c7cc;--fill:#e9e9ee;
+  --primary:#007aff;--primary-h:#0062cc;--on-primary:#fff;--primary-soft:#e5f0ff;--link:#0062cc;
+  --red:#c4161c;--red-bg:#ffe5e3;--amber:#8a4b00;--amber-bg:#fff0d1;--green:#1b6b35;--green-bg:#dff5e5;--gray:#555a63;--gray-bg:#ececf1;
+  --r:12px;--shadow:none;--tab-h:50px;--col:520px;
+}
+@media(prefers-color-scheme:dark){:root{
+  --outer:#000;--bg:#000;--surface:#1c1c1e;--text:#fff;--mute:#9d9da3;--line:#38383a;--line2:#48484a;--fill:#2c2c2e;
+  --primary:#0a84ff;--primary-h:#409cff;--on-primary:#fff;--primary-soft:#0b2a52;--link:#64a8ff;
+  --red:#ff6961;--red-bg:#3b1816;--amber:#ffb340;--amber-bg:#3a2a0c;--green:#4cd964;--green-bg:#10301b;--gray:#a5a5ab;--gray-bg:#2c2c2e;
+}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+html{background:var(--outer)}
+body{margin:0;background:var(--outer);color:var(--text);font:17px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",Roboto,system-ui,sans-serif;
+  -webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
+.app{max-width:var(--col);margin:0 auto;min-height:100vh;min-height:100dvh;background:var(--bg);position:relative;
+  padding:env(safe-area-inset-top) 0 calc(var(--tab-h) + env(safe-area-inset-bottom) + 8px)}
+@media(min-width:560px){.app{border-left:1px solid var(--line);border-right:1px solid var(--line)}}
+a,button,input,select{touch-action:manipulation}
+a{color:var(--link);text-decoration:none}
+a:hover{text-decoration:underline}
+:focus-visible{outline:3px solid var(--primary);outline-offset:2px;border-radius:8px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* khung */
+.sp{flex:1}
+.icon-btn{width:44px;height:44px;display:grid;place-items:center;border-radius:50%;color:var(--primary)}
+.icon-btn:hover{background:var(--fill);text-decoration:none}
+.titlebar{display:flex;align-items:center;gap:8px;margin:8px 0 4px}
+.titlebar h1{margin:0;flex:1}
+.tabs{position:fixed;left:0;right:0;bottom:0;max-width:var(--col);margin:0 auto;height:calc(var(--tab-h) + env(safe-area-inset-bottom));
+  padding-bottom:env(safe-area-inset-bottom);display:grid;grid-template-columns:repeat(5,1fr);z-index:30;
+  background:color-mix(in srgb,var(--surface) 82%,transparent);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  border-top:.5px solid var(--line)}
+.tabs a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;font-weight:500;color:var(--mute);min-height:44px}
+.tabs a:hover{text-decoration:none}
+.tabs a[aria-current=page]{color:var(--primary)}
+.tabs .add{color:var(--primary)}
+main{padding:12px 16px 24px}
+h1{font-size:34px;line-height:1.12;margin:8px 0 6px;font-weight:700;letter-spacing:.2px}
+h2{font-size:13px;margin:24px 0 8px 16px;color:var(--mute);text-transform:uppercase;letter-spacing:.02em;font-weight:400}
+.sub{color:var(--mute);margin:0 0 16px;font-size:15px}
+.mute{color:var(--mute);font-size:14px}
+
+/* thẻ & danh sách */
+.card{background:var(--surface);border-radius:var(--r);padding:16px;margin-bottom:16px}
+.card.flat{box-shadow:none}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.list{background:var(--surface);border-radius:var(--r);overflow:hidden;margin-bottom:16px}
+.li{display:flex;gap:12px;align-items:center;padding:12px 16px;min-height:52px;color:var(--text);position:relative}
+.li+.li::before,.alert+.alert::before,.rule+.rule::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--line)}
+a.li:hover{background:var(--fill);text-decoration:none}
+a.li::after{content:"";width:8px;height:14px;flex:none;opacity:.4;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 14'%3E%3Cpath d='M1 1l6 6-6 6' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 14'%3E%3Cpath d='M1 1l6 6-6 6' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
+.li .grow{flex:1;min-width:0}
+.li .t{font-weight:600;overflow-wrap:anywhere}
+.li .r{text-align:right;white-space:nowrap}
+.stat{font-size:28px;font-weight:700;letter-spacing:-.01em;line-height:1.2}
+
+/* trạng thái: luôn có icon + chữ, không chỉ dựa vào màu */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px 3px 7px;border-radius:99px;font-size:13px;font-weight:600;white-space:nowrap}
+.b-overdue{background:var(--red-bg);color:var(--red)}.b-soon{background:var(--amber-bg);color:var(--amber)}
+.b-info{background:var(--primary-soft);color:var(--link)}
+.b-ok{background:var(--green-bg);color:var(--green)}.b-unknown{background:var(--gray-bg);color:var(--gray)}
+.alert{display:flex;gap:12px;align-items:center;padding:14px 16px;position:relative}
+.alert .dot{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:none;align-self:flex-start}
+.alert.overdue .dot{background:var(--red-bg);color:var(--red)}.alert.soon .dot{background:var(--amber-bg);color:var(--amber)}
+.hero{display:flex;gap:14px;align-items:center;padding:18px 16px;border-radius:var(--r);margin-bottom:16px}
+.hero.bad{background:var(--red-bg);color:var(--red)}.hero.warn{background:var(--amber-bg);color:var(--amber)}.hero.good{background:var(--green-bg);color:var(--green)}
+.hero .big{font-size:20px;font-weight:700;line-height:1.3}
+
+/* form: chữ 16px để iPhone không tự phóng to, vùng chạm >= 44px */
+input,select,textarea,button{font:inherit;color:inherit;background:var(--surface);border:1px solid var(--line2);border-radius:10px;padding:10px 12px;min-height:44px;max-width:100%;-webkit-appearance:none;appearance:none}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%238e8e93' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:34px}
+input:focus,select:focus{border-color:var(--primary)}
+input[type=checkbox]{-webkit-appearance:checkbox;appearance:auto;min-height:0;width:22px;height:22px;padding:0;flex:none;accent-color:var(--primary)}
+.item input[type=checkbox]{width:22px}
+button{cursor:pointer;font-weight:600}
+button:hover{background:var(--gray-bg)}
+button.primary,.btn{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+button.primary:hover,.btn:hover{background:var(--primary-h);text-decoration:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:50px;padding:12px 18px;border-radius:14px;font-weight:600;font-size:17px}
+.btn.ghost{background:var(--primary-soft);color:var(--link);border:0}
+.btn.ghost:hover{background:var(--gray-bg)}
+button.danger{color:var(--red);border-color:var(--red);background:transparent}
+button:disabled{opacity:.55;cursor:not-allowed}
+.block{width:100%}
+label{display:block;font-size:14px;color:var(--mute);margin-bottom:4px;font-weight:600}
+.form{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));align-items:end}
+.field input,.field select{width:100%}
+.num{width:120px}
+
+/* dòng hạng mục trên phiếu: dạng thẻ, dùng tốt trên điện thoại */
+.item{border-radius:12px;padding:14px;margin-bottom:12px;display:grid;gap:10px;grid-template-columns:1fr 1fr 1fr;background:var(--surface)}
+.item .full{grid-column:1/-1}
+.item input,.item select{width:100%}
+.item.empty{opacity:.75}
+@media(max-width:520px){.item{grid-template-columns:1fr 1fr}.item .full,.item .amt{grid-column:1/-1}}
+
+/* dòng cấu hình theo linh kiện */
+.rule{display:grid;gap:10px 14px;grid-template-columns:28px 1fr auto;align-items:center;padding:14px 16px;position:relative}
+.rule .iv-box{grid-column:2/-1}
+.rule .iv-box>summary{cursor:pointer;min-height:28px;font-size:14px}
+.rule .iv{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.rule .iv input{width:96px}
+
+.flash{padding:12px 14px;border-radius:12px;background:var(--amber-bg);color:var(--amber);margin-bottom:14px;font-weight:500;overflow-wrap:anywhere}
+.flash.ok{background:var(--green-bg);color:var(--green)}
+.steps{counter-reset:s;display:grid;gap:10px}
+.step{display:flex;gap:12px;align-items:center}
+.step .n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:14px;background:var(--gray-bg);color:var(--gray);flex:none}
+.step.done .n{background:var(--green-bg);color:var(--green)}
+.step.done .t{color:var(--mute);text-decoration:line-through}
+
+/* biểu đồ cột */
+.bars{display:flex;align-items:flex-end;gap:6px;height:130px}
+.bars>div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;min-width:0}
+.bars i{display:block;width:100%;background:var(--primary);border-radius:6px 6px 0 0;min-height:3px;opacity:.9}
+.bars span{font-size:11px;color:var(--mute);margin-top:4px}
+.up{color:var(--red);font-weight:700}.down{color:var(--green);font-weight:700}
+img.slip{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+details.card>summary{cursor:pointer;font-weight:600;min-height:28px}
+.split{display:grid;gap:14px;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);align-items:start}
+@media(max-width:800px){.split{grid-template-columns:1fr}}
+.tblwrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 8px;border-bottom:.5px solid var(--line)}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute)}td.r,th.r{text-align:right}
+.seg{display:flex;background:var(--fill);border-radius:9px;padding:2px}
+.seg a{flex:1;text-align:center;padding:7px 10px;color:var(--text);font-weight:500;font-size:14px;min-height:32px;border-radius:7px;display:flex;align-items:center;justify-content:center}
+.seg a[aria-current=true]{background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.18);font-weight:600}
+.seg a:hover{text-decoration:none}
