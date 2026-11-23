@@ -48,22 +48,38 @@ Your app is at `https://servicebook.<your-subdomain>.workers.dev`. To use your o
 
 ## Use your own domain
 
-A Worker can only be attached to a domain whose DNS is hosted **in your Cloudflare account** (free plan is fine). A subdomain such as `cars.example.com` cannot be attached if `example.com`'s DNS lives at another provider. Two ways to get a suitable domain:
+Pick the way that matches where your domain's DNS lives.
 
-- **Register a new domain with Cloudflare Registrar** (sold at cost; DNS is already on Cloudflare), or
-- **Add an existing domain to Cloudflare** (Cloudflare dashboard → Add a domain, then change the nameservers at your registrar). Before switching, make sure Cloudflare imported *every* existing record (website, mail/MX, other subdomains) — changing nameservers moves all of them.
+### A. Your DNS stays where it is (name.com, GoDaddy, Hostinger… — one CNAME, nothing else changes)
 
-Then, on your machine:
+A small Cloudflare **Pages** project (`edge/`) acts as the front door: it accepts your domain through a plain CNAME and passes every request unchanged to the ServiceBook Worker. Works for **subdomains** (e.g. `cars.example.com`), not for a bare apex domain.
+
+```bash
+npm run release                                   # the main Worker must exist first
+npx wrangler pages project create servicebook-edge --production-branch main --force   # once
+npm run release:edge
+```
+Then in the Cloudflare dashboard: **Workers & Pages → servicebook-edge → Custom domains → Set up a custom domain**, enter `cars.example.com`, choose **My DNS provider**, and add the CNAME it shows at your DNS provider:
+
+| Type | Host | Answer |
+|---|---|---|
+| CNAME | `cars` | `servicebook-edge.pages.dev` |
+
+Existing records (website, mail, other subdomains) are not touched. Within minutes `https://cars.example.com` serves the app with HTTPS.
+
+### B. Your DNS is (or can be) on Cloudflare
+
+Register the domain with Cloudflare Registrar, or add an existing domain to Cloudflare (change nameservers only after checking Cloudflare imported *every* record — website, mail/MX, subdomains). Then:
 
 ```bash
 export SERVICEBOOK_DOMAIN=cars.example.com      # host name only, no https://
 npm run release
 ```
+Cloudflare creates the DNS record and certificate automatically. Optional: `SERVICEBOOK_DISABLE_WORKERS_DEV=1` and release again to switch the `*.workers.dev` address off.
 
-Cloudflare creates the DNS record and the HTTPS certificate automatically (a few minutes). Afterwards:
+### After either option
 1. Sign in at the new address (cookies are per-domain, so you sign in again).
 2. If you use Telegram replies: Settings → *Enable Telegram replies* again (the webhook address changed).
-3. Optional: `export SERVICEBOOK_DISABLE_WORKERS_DEV=1` and release once more to switch the `*.workers.dev` address off.
 
 ## 5. First steps in the app
 

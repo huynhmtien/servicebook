@@ -15,7 +15,8 @@
     "db:migrate": "node scripts/deploy.mjs migrate",
     "db:migrate:local": "wrangler d1 migrations apply servicebook --local",
     "e2e": "node e2e/run.mjs",
-    "audit:ui": "node e2e/ui-audit.mjs"
+    "audit:ui": "node e2e/ui-audit.mjs",
+    "release:edge": "cd edge && wrangler pages deploy public --project-name servicebook-edge --branch main --commit-dirty=true"
   },
   "engines": {
     "node": ">=22"

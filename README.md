@@ -38,7 +38,7 @@ export SERVICEBOOK_D1_ID=<database_id>
 npm run release -- --secrets-file secrets.env
 ```
 
-Open `https://servicebook.<your-subdomain>.workers.dev` (or [your own domain](SETUP.md#use-your-own-domain)), sign in, and follow the quick-start checklist on the home screen.
+Open `https://servicebook.<your-subdomain>.workers.dev` (or [your own domain](SETUP.md#use-your-own-domain) — one CNAME at your current DNS provider is enough), sign in, and follow the quick-start checklist on the home screen.
 
 ## Configuration
 

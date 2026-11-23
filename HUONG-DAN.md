@@ -48,22 +48,38 @@ App ở `https://servicebook.<tên-miền-phụ-của-bạn>.workers.dev`. Muố
 
 ## Dùng tên miền riêng
 
-Worker chỉ gắn được vào tên miền có DNS **nằm trong tài khoản Cloudflare của bạn** (gói miễn phí là đủ). Tên miền phụ như `cars.example.com` không gắn được nếu DNS của `example.com` đang ở nhà cung cấp khác. Hai cách có tên miền phù hợp:
+Chọn cách phù hợp với nơi đặt DNS của tên miền bạn.
 
-- **Đăng ký tên miền mới ở Cloudflare Registrar** (bán đúng giá gốc; DNS đã nằm sẵn ở Cloudflare), hoặc
-- **Thêm tên miền đang có vào Cloudflare** (dashboard → Add a domain, rồi đổi nameserver ở nơi bạn đăng ký). Trước khi đổi, hãy chắc Cloudflare đã nhập **đủ** mọi bản ghi hiện có (website, thư/MX, các tên miền phụ khác) — đổi nameserver là chuyển tất cả chúng.
+### A. DNS giữ nguyên ở chỗ cũ (name.com, GoDaddy, Hostinger… — chỉ thêm một CNAME, không đổi gì khác)
 
-Sau đó, trên máy của bạn:
+Một dự án **Pages** nhỏ của Cloudflare (`edge/`) làm "cửa trước": nhận tên miền của bạn qua CNAME thường và chuyển nguyên yêu cầu sang Worker ServiceBook. Dùng được cho **tên miền phụ** (vd `xe.example.com`), không dùng cho tên miền gốc trần.
 
 ```bash
-export SERVICEBOOK_DOMAIN=cars.example.com      # chỉ tên máy chủ, không có https://
+npm run release                                   # Worker chính phải có trước
+npx wrangler pages project create servicebook-edge --production-branch main --force   # một lần
+npm run release:edge
+```
+Rồi trong dashboard Cloudflare: **Workers & Pages → servicebook-edge → Custom domains → Set up a custom domain**, nhập `xe.example.com`, chọn **My DNS provider**, và thêm CNAME mà nó hiện ở nơi quản lý DNS:
+
+| Loại | Host | Giá trị |
+|---|---|---|
+| CNAME | `xe` | `servicebook-edge.pages.dev` |
+
+Các bản ghi cũ (website, thư, tên miền phụ khác) không bị đụng tới. Vài phút sau `https://xe.example.com` chạy app với HTTPS.
+
+### B. DNS đang (hoặc chuyển được) ở Cloudflare
+
+Đăng ký tên miền ở Cloudflare Registrar, hoặc thêm tên miền đang có vào Cloudflare (chỉ đổi nameserver sau khi chắc Cloudflare đã nhập **đủ** mọi bản ghi — website, thư/MX, tên miền phụ). Rồi:
+
+```bash
+export SERVICEBOOK_DOMAIN=xe.example.com      # chỉ tên máy chủ, không có https://
 npm run release
 ```
+Cloudflare tự tạo DNS và chứng chỉ. Tùy chọn: `SERVICEBOOK_DISABLE_WORKERS_DEV=1` rồi release lại để tắt địa chỉ `*.workers.dev`.
 
-Cloudflare tự tạo bản ghi DNS và chứng chỉ HTTPS (vài phút). Sau đó:
+### Sau khi xong (cả hai cách)
 1. Đăng nhập lại ở địa chỉ mới (cookie gắn theo từng tên miền).
 2. Nếu dùng trả lời qua Telegram: Cài đặt → *Bật trả lời qua Telegram* lần nữa (địa chỉ webhook đã đổi).
-3. Tùy chọn: `export SERVICEBOOK_DISABLE_WORKERS_DEV=1` rồi release thêm một lần để tắt địa chỉ `*.workers.dev`.
 
 ## 5. Những bước đầu trong app
 

@@ -1,0 +1,9 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "servicebook-edge",
+  "pages_build_output_dir": "./public",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // service binding to the main Worker (must be deployed first: `npm run release`)
+  "services": [{ "binding": "APP", "service": "servicebook" }]
+}
