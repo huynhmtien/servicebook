@@ -42,7 +42,7 @@ Open `https://servicebook.<your-subdomain>.workers.dev`, sign in, and follow the
 
 ## Configuration
 
-Secrets (Worker secrets / `.dev.vars` locally — see [`.dev.vars.example`](.dev.vars.example)):
+Secrets (Worker secrets / `.dev.vars` locally — see [`.dev.vars.example`](.dev.vars.example)). The AI and Telegram keys can instead be **pasted into Settings → Integrations & API keys** (stored encrypted in your database, never shown again); a Worker secret always wins over a key saved in the app.
 
 | Variable | Purpose |
 |---|---|
@@ -56,6 +56,7 @@ Preferences (in the app, **Settings**): language, currency, distance unit, tax l
 ## Privacy & security
 
 - Receipt photos are **not stored**. They are sent to the AI provider you chose (Google Gemini, DeepSeek or Anthropic) only to be read. Choose a provider whose terms you accept.
+- API keys pasted into the app are stored **encrypted** (AES-GCM, key derived from `SESSION_SECRET`) and only shown as a masked tail; they can only be saved when the app is password-protected.
 - Data lives in **your** Cloudflare D1 database. Download backups regularly (Settings → Backup).
 - Always set `APP_PASSWORD` and `SESSION_SECRET`: without them anyone who knows the URL can read and edit your data. Sessions are signed (HMAC), logins are rate-limited, comparisons are constant-time.
 - Report vulnerabilities privately — see [SECURITY.md](SECURITY.md).

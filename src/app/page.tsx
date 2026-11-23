@@ -2,6 +2,7 @@ import Link from "next/link";
 import { all, get } from "../lib/db.ts";
 import { listVehicles, vehicleRules, vehicleAvgKmPerDay } from "../lib/queries.ts";
 import { telegramConfigured } from "../lib/telegram.ts";
+import { scanEnabled } from "../lib/extract.ts";
 import { INITIAL_NOTE, addMonths, today } from "../lib/util.ts";
 import { getI18n } from "../lib/settings.ts";
 import { partLabel } from "../lib/parts.ts";
@@ -28,6 +29,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     { t: t("dash.step_prefs"), href: "/settings", done: settings.confirmed },
     { t: t("dash.step_vehicle"), href: "/vehicles", done: vehicles.length > 0 },
     { t: t("dash.step_setup"), href: vehicles[0] ? `/vehicles/${vehicles[0].id}/setup` : "/vehicles", done: known > 0 },
+    { t: t("dash.step_ai"), href: "/settings#keys", done: scanEnabled() },
     { t: t("dash.step_slip"), href: "/records/new", done: realRecords > 0 },
     { t: t("dash.step_telegram"), href: "/settings", done: telegramConfigured() },
   ];

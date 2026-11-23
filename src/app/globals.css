@@ -61,6 +61,7 @@ a.li::after{content:"";width:8px;height:14px;flex:none;opacity:.4;background:cur
 
 /* status: always icon + text, never color alone */
 .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px 3px 7px;border-radius:99px;font-size:13px;font-weight:600;white-space:nowrap}
+.badge.wrap{white-space:normal;max-width:100%;border-radius:14px}
 .b-overdue{background:var(--red-bg);color:var(--red)}.b-soon{background:var(--amber-bg);color:var(--amber)}
 .b-info{background:var(--primary-soft);color:var(--link)}
 .b-ok{background:var(--green-bg);color:var(--green)}.b-unknown{background:var(--gray-bg);color:var(--gray)}

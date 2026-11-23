@@ -5,6 +5,7 @@ import { all, run } from "./db.ts";
 import { LANGS, detectLang, detectRegion, isLang, translator, type Lang, type T } from "./i18n/index.ts";
 import { makeFmt, type DistanceUnit, type Fmt } from "./format.ts";
 import { setTz } from "./util.ts";
+import { loadSecrets } from "./secrets.ts";
 
 export interface Settings {
   /** Saved value: a specific language or "auto" (follow the browser). */
@@ -48,6 +49,7 @@ const VALID_TZ = (z: string) => { try { new Intl.DateTimeFormat("en", { timeZone
 
 /** Read settings (created with defaults on first use). Calling it several times in one request queries only once. */
 export const getSettings = cache(async (): Promise<Settings> => {
+  await loadSecrets(); // keys saved in the app → process.env, before anything reads them
   let rows = await all<{ key: string; value: string }>("SELECT key, value FROM settings");
   let m = Object.fromEntries(rows.map((r) => [r.key, r.value]));
   let al: string | null = null;

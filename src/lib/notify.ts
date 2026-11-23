@@ -27,8 +27,8 @@ export type DigestResult = { status: "sent" | "none" | "not_configured" | "error
 
 /** Send the daily summary: all overdue / upcoming items. `force`: also send an "all good" message. */
 export async function sendDigest(force = false): Promise<DigestResult> {
+  const i18n = await getI18n(); // also loads keys saved in the app
   if (!telegramConfigured()) return { status: "not_configured" };
-  const i18n = await getI18n();
   const items = await Promise.all((await listVehicles()).map(async (v) => ({
     vehicle: v.name, plate: v.plate, odo: v.odo, rows: await activeAlerts(v.id),
   })));
@@ -46,8 +46,8 @@ export async function sendDigest(force = false): Promise<DigestResult> {
 
 /** Send immediately when an item newly changes status (upcoming / overdue); each level is reported only once. */
 export async function notifyEscalations(): Promise<void> {
-  if (!telegramConfigured()) return;
   const i18n = await getI18n();
+  if (!telegramConfigured()) return;
   const sent = new Set((await all<{ key: string }>("SELECT key FROM notifications WHERE key LIKE 'esc:%'")).map((r) => r.key));
   const items = await Promise.all((await listVehicles()).map(async (v) => {
     const rows = (await activeAlerts(v.id)).filter((r) => !sent.has(escKey(r)));
@@ -63,8 +63,8 @@ export async function notifyEscalations(): Promise<void> {
 
 /** Remind to update ODO if the last entry is over 14 days old (at most once per 7 days per vehicle). Km-based warnings are only accurate when ODO is kept up to date. */
 async function nudgeOdometer(): Promise<void> {
-  if (!telegramConfigured()) return;
   const i18n = await getI18n();
+  if (!telegramConfigured()) return;
   for (const v of await listVehicles()) {
     const last = await get<{ d: string | null }>("SELECT MAX(date) AS d FROM odometer_logs WHERE vehicle_id = ?", v.id);
     const age = last?.d ? daysBetween(last.d, today()) : 999;

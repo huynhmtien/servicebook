@@ -1,9 +1,11 @@
 import { ping } from "../../../lib/db.ts";
+import { getSettings } from "../../../lib/settings.ts";
 
 export const dynamic = "force-dynamic";
 
 /** Diagnostics page: checks config variables and the database connection (without exposing secret values). */
 export async function GET() {
+  await getSettings(); // loads keys saved in the app
   const env = process.env;
   const flags = {
     APP_PASSWORD: !!env.APP_PASSWORD,

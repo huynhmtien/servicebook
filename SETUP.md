@@ -22,18 +22,17 @@ The id is **not** stored in the repository. `npm run release` substitutes it fro
 
 ## 3. Prepare secrets
 
-Create `secrets.env` (never commit it — `*.env` is git-ignored):
+Create `secrets.env` (never commit it — `*.env` is git-ignored). Only three values are needed here:
 
 ```
 APP_PASSWORD=choose-a-strong-password
 SESSION_SECRET=<openssl rand -hex 32>
 CRON_SECRET=<openssl rand -hex 24>
-GEMINI_API_KEY=...          # or ANTHROPIC_API_KEY / DEEPSEEK_API_KEY — receipt scanning
-TELEGRAM_BOT_TOKEN=...      # optional
-TELEGRAM_CHAT_ID=...        # optional
 ```
 
-Where to get the optional values:
+**AI and Telegram keys are entered later in the app** (Settings → *Integrations & API keys*): paste them in, no command line. They are stored encrypted in your database (AES-GCM, key derived from `SESSION_SECRET`) and are never shown again — only a masked tail like `••••2345`. This works only when `APP_PASSWORD` and `SESSION_SECRET` are set. If you prefer, you can still set them as Worker secrets (`GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`); a Worker secret always wins over a key saved in the app.
+
+Where to get the keys:
 - **Gemini key**: https://aistudio.google.com/apikey (free tier available). Anthropic: https://console.anthropic.com. DeepSeek: https://platform.deepseek.com.
 - **Telegram**: talk to **@BotFather**, `/newbot`, copy the token. Send any message to your new bot, then ask **@userinfobot** for your numeric id → `TELEGRAM_CHAT_ID`.
 
@@ -53,7 +52,8 @@ Your app is at `https://servicebook.<your-subdomain>.workers.dev`. For a custom 
 2. **Settings** → choose language, currency, distance unit, tax label, time zone and the daily reminder hour, then **Save** (the home checklist marks this step done).
 3. **Vehicles** → add your car (pick the fuel type), then enter the last replacement of each part you remember.
 4. **Add slip** → photograph an invoice, review, save.
-5. **Telegram** (optional): Settings → *Check & send test message*; then *Enable Telegram replies* so you can text the bot a number (e.g. `52000`) to update the odometer.
+5. **Keys**: Settings → *Integrations & API keys* → paste a Gemini (or Anthropic/DeepSeek) key to read receipts, and the Telegram bot token + chat id for reminders.
+6. **Telegram** (optional): Settings → *Check & send test message*; then *Enable Telegram replies* so you can text the bot a number (e.g. `52000`) to update the odometer.
 
 ## Updating the intervals to your car's real values
 
@@ -99,6 +99,6 @@ Never edit an old migration. Add `migrations/000N_name.sql` and run `npm run db:
 
 - **"Missing SESSION_SECRET"** after login: set `SESSION_SECRET` (and redeploy, or re-run with `--secrets-file`).
 - **Open `/api/health`** (signed in) to see which settings are present and whether the database responds.
-- **Scanning says no AI key**: set one of the AI key secrets.
+- **Scanning says no AI key**: paste one in Settings → Integrations & API keys.
 - **Telegram test fails**: the message names the exact problem (token, chat id, bot not started).
 - **Deploy hangs**: don't name an npm script `deploy` in this repo — Wrangler/OpenNext treat it specially (that is why the script is `release`).

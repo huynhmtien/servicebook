@@ -8,6 +8,7 @@ SESSION_SECRET=      # long random string: openssl rand -hex 32
 # Protects the hourly cron endpoint (random string: openssl rand -hex 24)
 CRON_SECRET=
 
+# AI keys and Telegram settings can ALSO be pasted in the app (Settings → Integrations & API keys) instead of here.
 # AI slip reading: ONE key is enough. With several keys, set AI_PROVIDER=gemini|claude|deepseek
 GEMINI_API_KEY=
 ANTHROPIC_API_KEY=

@@ -13,18 +13,18 @@ import { telegramDiagnose, setTelegramWebhook, telegramConfigured, type Step } f
 import { webhookSecret } from "../lib/telegram-bot.ts";
 import { getI18n, saveSettings } from "../lib/settings.ts";
 import { restoreBackup } from "../lib/backup.ts";
+import { KEY_FIELDS, validateKey } from "../lib/secret-crypto.ts";
+import { canStoreKeys, deleteSecret, loadSecrets, setSecret } from "../lib/secrets.ts";
 import { INITIAL_NOTE, normName, today } from "../lib/util.ts";
 
-/** Go back to the page with a "done" notice so the user always sees feedback. */
-const done = (path: string, msg: string): never => {
-  const sep = path.includes("?") ? "&" : "?";
-  redirect(`${path}${sep}ok=${encodeURIComponent(msg)}`);
+/** Redirect back with a one-off notice in the query string (a #fragment, if any, stays at the end of the URL). */
+const withNotice = (path: string, key: "ok" | "error", msg: string): never => {
+  const [base, hash] = path.split("#");
+  const sep = base.includes("?") ? "&" : "?";
+  redirect(`${base}${sep}${key}=${encodeURIComponent(msg)}${hash ? `#${hash}` : ""}`);
 };
-
-const fail = (path: string, msg: string): never => {
-  const sep = path.includes("?") ? "&" : "?";
-  redirect(`${path}${sep}error=${encodeURIComponent(msg)}`);
-};
+const done = (path: string, msg: string): never => withNotice(path, "ok", msg);
+const fail = (path: string, msg: string): never => withNotice(path, "error", msg);
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 /** Integer (ODO, km, months, year): strips any vi/en thousands separators (48.500 / 48,500 / 48 500). */
@@ -303,6 +303,29 @@ export async function sendDigestNow(_prev: TgState, _f: FormData): Promise<TgSta
   if (r.status === "none") return { ok: true, message: t("tg.digest_empty") };
   if (r.status === "sent") return { ok: true, message: t("tg.digest_sent") };
   return { ok: false, message: r.status === "not_configured" ? t("tg.not_configured") : r.error ?? "" };
+}
+
+/** Save API keys / tokens typed into Settings (encrypted in the database; blank = keep, "remove" checkbox = delete). */
+export async function saveKeysAction(f: FormData) {
+  const { t } = await getI18n();
+  if (!canStoreKeys()) return fail("/settings#keys", t("keys.need_password"));
+  const label: Record<string, string> = {
+    GEMINI_API_KEY: t("keys.f_gemini"), ANTHROPIC_API_KEY: t("keys.f_anthropic"), DEEPSEEK_API_KEY: t("keys.f_deepseek"),
+    TELEGRAM_BOT_TOKEN: t("keys.f_tg_token"), TELEGRAM_CHAT_ID: t("keys.f_tg_chat"),
+  };
+  const writes: (() => Promise<void>)[] = [];
+  for (const { name } of KEY_FIELDS) {
+    if (f.get(`clear_${name}`)) { writes.push(() => deleteSecret(name)); continue; }
+    const raw = s(f, name);
+    if (!raw) continue;
+    const v = validateKey(name, raw);
+    if (!v) return fail("/settings#keys", t("keys.invalid", { field: label[name] }));
+    writes.push(() => setSecret(name, v));
+  }
+  for (const w of writes) await w(); // everything is validated first: nothing is saved if one field is wrong
+  await loadSecrets();
+  revalidatePath("/", "layout");
+  done("/settings#keys", t("keys.saved"));
 }
 
 /** Enable receiving replies from the bot (update ODO via message). */

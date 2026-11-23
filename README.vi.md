@@ -40,13 +40,14 @@ npm run release -- --secrets-file secrets.env
 
 ## Cấu hình
 
-Bí mật (secret của Worker / `.dev.vars` khi chạy thử — xem [`.dev.vars.example`](.dev.vars.example)): `APP_PASSWORD` + `SESSION_SECRET` (đăng nhập), `CRON_SECRET`, một trong `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` / `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`.
+Bí mật (secret của Worker / `.dev.vars` khi chạy thử — xem [`.dev.vars.example`](.dev.vars.example)). Khóa AI và Telegram có thể **dán thẳng vào Cài đặt → Tích hợp & khóa API** (mã hóa trong database, không hiển thị lại); secret của Worker luôn được ưu tiên hơn khóa lưu trong app. `APP_PASSWORD` + `SESSION_SECRET` (đăng nhập), `CRON_SECRET`, một trong `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` / `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`.
 
 Tùy chọn (trong app, mục **Cài đặt**): ngôn ngữ, tiền tệ, đơn vị quãng đường, tên thuế, múi giờ, giờ nhắc hằng ngày.
 
 ## Quyền riêng tư & bảo mật
 
 - Ảnh phiếu **không được lưu**; chỉ gửi cho nhà cung cấp AI bạn chọn (Google Gemini, DeepSeek hoặc Anthropic) để đọc. Hãy chọn nhà cung cấp có điều khoản bạn chấp nhận.
+- Khóa API dán vào app được lưu **mã hóa** (AES-GCM, khóa dẫn từ `SESSION_SECRET`), chỉ hiện đuôi che, và chỉ lưu được khi app đã có mật khẩu.
 - Dữ liệu nằm trong database D1 **của bạn**. Tải sao lưu định kỳ (Cài đặt → Sao lưu).
 - Luôn đặt `APP_PASSWORD` và `SESSION_SECRET`: không có thì ai biết địa chỉ cũng xem và sửa được dữ liệu.
 - Báo lỗ hổng riêng tư: xem [SECURITY.md](SECURITY.md).

@@ -22,18 +22,17 @@ Mã này **không** nằm trong repo. `npm run release` lấy từ biến `SERVI
 
 ## 3. Chuẩn bị bí mật
 
-Tạo `secrets.env` (đừng commit — `*.env` đã được git bỏ qua):
+Tạo `secrets.env` (đừng commit — `*.env` đã được git bỏ qua). Ở đây chỉ cần ba giá trị:
 
 ```
 APP_PASSWORD=mat-khau-manh-cua-ban
 SESSION_SECRET=<openssl rand -hex 32>
 CRON_SECRET=<openssl rand -hex 24>
-GEMINI_API_KEY=...          # hoặc ANTHROPIC_API_KEY / DEEPSEEK_API_KEY — để quét phiếu
-TELEGRAM_BOT_TOKEN=...      # tùy chọn
-TELEGRAM_CHAT_ID=...        # tùy chọn
 ```
 
-Lấy giá trị tùy chọn ở đâu:
+**Khóa AI và Telegram nhập sau, ngay trong app** (Cài đặt → *Tích hợp & khóa API*): chỉ việc dán, không cần dòng lệnh. Khóa được mã hóa trong database của bạn (AES-GCM, khóa dẫn từ `SESSION_SECRET`) và không bao giờ hiển thị lại — chỉ thấy đuôi che như `••••2345`. Chỉ lưu được khi đã đặt `APP_PASSWORD` và `SESSION_SECRET`. Nếu thích, vẫn đặt được dưới dạng secret của Worker (`GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`); secret của Worker luôn được ưu tiên hơn khóa lưu trong app.
+
+Lấy khóa ở đâu:
 - **Khóa Gemini**: https://aistudio.google.com/apikey (có gói miễn phí). Anthropic: https://console.anthropic.com. DeepSeek: https://platform.deepseek.com.
 - **Telegram**: chat với **@BotFather**, gõ `/newbot`, copy token. Nhắn một tin bất kỳ cho bot vừa tạo, rồi hỏi **@userinfobot** lấy Id số → `TELEGRAM_CHAT_ID`.
 
@@ -53,7 +52,8 @@ App ở `https://servicebook.<tên-miền-phụ-của-bạn>.workers.dev`. Muố
 2. **Cài đặt** → chọn ngôn ngữ, tiền tệ, đơn vị quãng đường, tên thuế, múi giờ, giờ nhắc hằng ngày → **Lưu** (bước này được đánh dấu xong ở trang chủ).
 3. **Xe** → thêm xe (chọn loại nhiên liệu), nhập lần thay gần nhất của các hạng mục bạn nhớ.
 4. **Thêm phiếu** → chụp phiếu, kiểm tra, lưu.
-5. **Telegram** (tùy chọn): Cài đặt → *Kiểm tra & gửi tin thử*; rồi *Bật trả lời qua Telegram* để nhắn cho bot một con số (vd `52000`) cập nhật ODO.
+5. **Khóa**: Cài đặt → *Tích hợp & khóa API* → dán khóa Gemini (hoặc Anthropic/DeepSeek) để đọc phiếu, và token bot + chat id Telegram để nhắc việc.
+6. **Telegram** (tùy chọn): Cài đặt → *Kiểm tra & gửi tin thử*; rồi *Bật trả lời qua Telegram* để nhắn cho bot một con số (vd `52000`) cập nhật ODO.
 
 ## Đưa chu kỳ về đúng số của xe bạn
 
@@ -79,6 +79,6 @@ Không sửa migration cũ. Thêm `migrations/000N_ten.sql` rồi `npm run db:mi
 
 - **Báo thiếu `SESSION_SECRET`** sau khi đăng nhập: đặt `SESSION_SECRET` (rồi deploy lại hoặc chạy lại với `--secrets-file`).
 - Mở **`/api/health`** (đã đăng nhập) để xem cấu hình nào đã có và database có phản hồi không.
-- **Quét phiếu báo chưa có khóa AI**: đặt một trong các secret khóa AI.
+- **Quét phiếu báo chưa có khóa AI**: dán một khóa ở Cài đặt → Tích hợp & khóa API.
 - **Thử Telegram lỗi**: thông báo nêu đúng vấn đề (token, chat id, chưa bấm Start với bot).
 - **Deploy bị treo**: đừng đặt tên script npm là `deploy` trong repo này — Wrangler/OpenNext xử lý riêng tên đó (vì vậy script tên `release`).

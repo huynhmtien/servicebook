@@ -4,7 +4,8 @@ import { getI18n } from "../../lib/settings.ts";
 import { LANGS, LANG_CODES } from "../../lib/i18n/index.ts";
 import Icon from "../components/Icon";
 import { Flash } from "../components/ui";
-import { logout, restoreAction, saveSettingsAction } from "../actions";
+import { logout, restoreAction, saveKeysAction, saveSettingsAction } from "../actions";
+import { canStoreKeys, keyStatuses } from "../../lib/secrets.ts";
 import ConfirmButton from "../components/ConfirmButton";
 import TelegramPanel from "../components/TelegramPanel";
 
@@ -14,6 +15,36 @@ export default async function Settings({ searchParams }: { searchParams: Promise
   const { ok, error } = await searchParams;
   const { t, settings: s } = await getI18n();
   const tg = telegramConfigured();
+  const statuses = keyStatuses();
+  const canKeys = canStoreKeys();
+  const FIELD_UI = {
+    GEMINI_API_KEY: { label: t("keys.f_gemini"), hint: t("keys.h_gemini") },
+    ANTHROPIC_API_KEY: { label: t("keys.f_anthropic"), hint: t("keys.h_anthropic") },
+    DEEPSEEK_API_KEY: { label: t("keys.f_deepseek"), hint: t("keys.h_deepseek") },
+    TELEGRAM_BOT_TOKEN: { label: t("keys.f_tg_token"), hint: t("keys.h_tg_token") },
+    TELEGRAM_CHAT_ID: { label: t("keys.f_tg_chat"), hint: t("keys.h_tg_chat") },
+  } as const;
+  const KeyField = ({ name }: { name: keyof typeof FIELD_UI }) => {
+    const st = statuses.find((x) => x.name === name)!;
+    const ui = FIELD_UI[name];
+    return (
+      <div className="field">
+        <label htmlFor={`k_${name}`}>{ui.label}</label>
+        {st.source === "env" ? (
+          <div className="mute"><span className="badge b-ok wrap"><Icon n="check" s={14} />{t("keys.s_env")}</span></div>
+        ) : (
+          <>
+            <input id={`k_${name}`} name={name} type="password" autoComplete="off" spellCheck={false} placeholder={t("keys.paste")} disabled={!canKeys} />
+            <div className="row" style={{ gap: 10, marginTop: 4 }}>
+              <span className={`badge wrap ${st.source === "app" ? "b-ok" : "b-unknown"}`}>{st.source === "app" ? t("keys.s_app", { masked: st.masked ?? "" }) : t("keys.s_none")}</span>
+              {st.source === "app" && <label style={{ margin: 0, display: "inline-flex", gap: 6, alignItems: "center" }}><input type="checkbox" name={`clear_${name}`} /> {t("keys.remove")}</label>}
+            </div>
+          </>
+        )}
+        <div className="mute">{ui.hint}</div>
+      </div>
+    );
+  };
   const ai = providerOrder();
   let zones: string[] = [];
   try { zones = (Intl as unknown as { supportedValuesOf: (k: string) => string[] }).supportedValuesOf("timeZone"); } catch { zones = []; }
@@ -55,6 +86,17 @@ export default async function Settings({ searchParams }: { searchParams: Promise
         <div className="field"><label htmlFor="reminder_hour">{t("set.reminder_hour")}</label>
           <input id="reminder_hour" name="reminder_hour" inputMode="numeric" defaultValue={s.reminderHour} /></div>
         <button className="btn primary" type="submit">{t("set.save")}</button>
+      </form>
+
+      <h2 id="keys">{t("keys.title")}</h2>
+      <form action={saveKeysAction} className="card form">
+        <p className="mute" style={{ margin: 0 }}>{t("keys.intro")}</p>
+        {!canKeys && <Flash text={t("keys.need_password")} />}
+        <b>{t("keys.group_ai")}</b>
+        <KeyField name="GEMINI_API_KEY" /><KeyField name="ANTHROPIC_API_KEY" /><KeyField name="DEEPSEEK_API_KEY" />
+        <b>{t("keys.group_tg")}</b>
+        <KeyField name="TELEGRAM_BOT_TOKEN" /><KeyField name="TELEGRAM_CHAT_ID" />
+        <button className="btn primary" type="submit" disabled={!canKeys}>{t("keys.save")}</button>
       </form>
 
       <div className="list" style={{ marginTop: 16 }}>

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0 — 2026-11-23
+- **API keys entered in the app**: Settings → *Integrations & API keys* (Gemini / Anthropic / DeepSeek, Telegram token + chat id). Stored AES-GCM-encrypted in D1 (key derived from `SESSION_SECRET`), shown only as a masked tail, validated before saving, and only allowed when the app is password-protected. A Worker secret still takes priority (migration 0006).
+- Quick-start checklist now includes adding an AI key.
+- Fix: notices now work with redirects that carry a `#fragment`.
+- React / react-dom 19.3.1, GitHub Actions bumps.
+
 ## 1.1.0 — 2026-11-23
 - **International**: English and Vietnamese UI (typed dictionaries, plurals; add a language with one file); currency in minor units (any ISO currency); kilometers or miles; configurable tax label and time zone; locale-aware numbers and dates. Settings page; first-run defaults come from the browser.
 - **Part catalog** with stable keys and bilingual names/keywords (English + Vietnamese); categories stored as keys (migration 0004).

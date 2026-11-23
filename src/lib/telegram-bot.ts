@@ -1,7 +1,7 @@
 import { all } from "./db.ts";
 import { setOdo } from "./queries.ts";
 import { esc, sendTelegram } from "./telegram.ts";
-import { getI18n } from "./settings.ts";
+import { getI18n, getSettings } from "./settings.ts";
 import { notifyEscalations } from "./notify.ts";
 import { safeEqual } from "./auth.ts";
 import { today } from "./util.ts";
@@ -23,8 +23,8 @@ export async function verifyWebhook(headerValue: string | null): Promise<boolean
 
 /** Handle a Telegram message sent to the bot. Only accepted from the app owner's TELEGRAM_CHAT_ID. */
 export async function handleTelegramUpdate(update: { message?: { chat?: { id?: number | string }; text?: string } }): Promise<void> {
-  const msg = update.message;
-  const chatId = String(process.env.TELEGRAM_CHAT_ID ?? "").trim().replace(/^["']|["']$/g, "");
+  await getSettings(); // loads a chat id / token saved in the app
+  const msg = update.message;  const chatId = String(process.env.TELEGRAM_CHAT_ID ?? "").trim().replace(/^["']|["']$/g, "");
   if (!msg?.text || !chatId || String(msg.chat?.id) !== chatId) return;
   const { t, fmt } = await getI18n();
   const text = msg.text.trim();
