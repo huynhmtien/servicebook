@@ -1,7 +1,7 @@
 {
   "name": "servicebook",
   "version": "1.0.0",
-  "description": "ServiceBook — sổ bảo dưỡng ô tô: nhắc hạn theo km/thời gian, quét phiếu bằng AI, so sánh giá. Chạy trên Cloudflare Workers + D1.",
+  "description": "ServiceBook — vehicle maintenance log: km/time reminders, AI receipt scan, price comparison. Runs free on Cloudflare Workers + D1.",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -16,7 +16,19 @@
     "db:migrate:local": "wrangler d1 migrations apply servicebook --local",
     "e2e": "node e2e/run.mjs",
     "audit:ui": "node e2e/ui-audit.mjs",
-    "release:edge": "cd edge && wrangler pages deploy public --project-name servicebook-edge --branch main --commit-dirty=true"
+    "release:edge": "cd edge && wrangler pages deploy public --project-name servicebook-edge --branch main --commit-dirty=true",
+    "deploy": "npm run db:migrations:apply && opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "db:migrations:apply": "wrangler d1 migrations apply DB --remote"
+  },
+  "cloudflare": {
+    "bindings": {
+      "APP_PASSWORD": {
+        "description": "The password you will sign in with. Choose a long one only you know (you can change it later in Settings)."
+      },
+      "SESSION_SECRET": {
+        "description": "Any **long random text** (40+ characters, e.g. from a password manager). It signs your login sessions and encrypts API keys you save in the app. Keep a copy: changing it later signs you out and you must paste saved API keys again."
+      }
+    }
   },
   "engines": {
     "node": ">=22"

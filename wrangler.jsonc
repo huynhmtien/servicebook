@@ -2,12 +2,14 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "servicebook",
   "main": "worker.ts",
-  "compatibility_date": "2026-11-01",
+  "compatibility_date": "2026-11-23",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "observability": { "enabled": true },
   "triggers": { "crons": ["0 * * * *"] },
   "d1_databases": [
-    { "binding": "DB", "database_name": "servicebook", "database_id": "REPLACE_WITH_YOUR_D1_ID", "migrations_dir": "migrations" }
+    // database_id is intentionally absent: "Deploy to Cloudflare" creates the database and fills it in.
+    // For CLI deploys set SERVICEBOOK_D1_ID (see scripts/deploy.mjs).
+    { "binding": "DB", "database_name": "servicebook", "migrations_dir": "migrations" }
   ]
 }

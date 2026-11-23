@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { AUTH_COOKIE, verifySession } from "./lib/auth";
+import { getEpoch } from "./lib/credentials";
 
 const PUBLIC = [/^\/login$/, /^\/manifest\.webmanifest$/, /^\/icon-\d+\.png$/, /^\/apple-touch-icon\.png$/, /^\/api\/cron$/, /^\/api\/telegram$/];
 
@@ -12,7 +13,10 @@ export async function middleware(req: NextRequest) {
   const secret = process.env.SESSION_SECRET;
   // password enabled but signing key missing → reject everything (safer than leaving it open)
   if (!secret) return new NextResponse("Thiếu SESSION_SECRET — xem HUONG-DAN.md", { status: 503 });
-  if (await verifySession(req.cookies.get(AUTH_COOKIE)?.value, secret)) return NextResponse.next();
+  const token = req.cookies.get(AUTH_COOKIE)?.value;
+  if (await verifySession(token, secret, await getEpoch())) return NextResponse.next();
+  // not valid for the (possibly stale) remembered epoch: re-read it before rejecting, so a freshly issued session is accepted at once
+  if (token && (await verifySession(token, secret, await getEpoch(true)))) return NextResponse.next();
   if (req.method !== "GET") return new NextResponse("Cần đăng nhập", { status: 401 });
   const url = req.nextUrl.clone();
   url.pathname = "/login";

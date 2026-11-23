@@ -128,6 +128,47 @@ check("Back to English", (await txt(".flash")).includes("Settings saved") && (aw
 await go("/");
 check("Quick-start 'check settings' step is done after saving", !(await txt()).includes("Check language, currency and units") || (await page.locator(".step.done").count()) > 0);
 
+// 8. Change the password in the app + sign out other devices
+if (process.env.APP_PASSWORD) {
+  const OLD = process.env.APP_PASSWORD, NEW = "new-pass-12345";
+  const other = await (await browser.newContext({ viewport: { width: 390, height: 844 }, locale: "en-US" })).newPage(); // a second device
+  await other.goto(BASE + "/login", { waitUntil: "networkidle" });
+  await other.fill("#password", OLD); await other.click("button.primary"); await other.waitForURL((u) => !u.pathname.startsWith("/login"));
+  check("A second device is signed in before the change", (await other.goto(BASE + "/vehicles")).status() === 200 && !other.url().includes("/login"));
+
+  const changePw = async (cur, nw, again, signoutAll = true, skipBrowserChecks = false) => {
+    await go("/settings");
+    // the browser itself blocks too-short passwords (minlength); drop it to exercise the server-side rule too
+    if (skipBrowserChecks) await page.evaluate(() => document.querySelectorAll("input[minlength]").forEach((i) => i.removeAttribute("minlength")));
+    await page.fill("#pw_current", cur); await page.fill("#pw_new", nw); await page.fill("#pw_confirm", again);
+    if (!signoutAll) await page.uncheck('input[name="signout_all"]');
+    await page.click("button:has-text('Change password')");
+    await page.waitForURL(/\/settings\?(ok|error)=/);
+    return txt(".flash");
+  };
+  check("Wrong current password is rejected", (await changePw("not-my-password", NEW, NEW)).includes("current password is wrong"));
+  check("Mismatched confirmation is rejected", (await changePw(OLD, NEW, NEW + "x")).includes("don't match"));
+  check("Too-short password is rejected (min 8 characters)", (await changePw(OLD, "short", "short", true, true)).includes("at least 8"));
+  check("The browser blocks a too-short password before submitting", await (async () => { await go("/settings"); await page.fill("#pw_current", OLD); await page.fill("#pw_new", "abc"); await page.fill("#pw_confirm", "abc"); await page.click("button:has-text('Change password')"); await page.waitForTimeout(500); return page.url().includes("/settings") && !page.url().includes("?"); })());
+  check("Reusing the current password is rejected", (await changePw(OLD, OLD, OLD)).includes("different"));
+
+  const changedMsg = await changePw(OLD, NEW, NEW);
+  check("Password changed; others signed out message", changedMsg.includes("All other devices were signed out"), `flash="${changedMsg}" url=${page.url()}`);
+  check("This device stays signed in after the change", (await page.goto(BASE + "/vehicles")).status() === 200 && !page.url().includes("/login"));
+  await other.waitForTimeout(6000); // the epoch is memoised for 5 s per instance
+  await other.goto(BASE + "/vehicles", { waitUntil: "networkidle" });
+  check("The other device was signed out (back at the login page)", other.url().includes("/login"), other.url());
+
+  await go("/settings"); await page.click("button:has-text('Log out')"); await page.waitForURL(/\/login/);
+  await page.fill("#password", OLD); await page.click("button.primary"); await page.waitForTimeout(1500);
+  check("The OLD password no longer works", page.url().includes("/login") && (await txt(".flash")).includes("Wrong password"), page.url());
+  await page.fill("#password", NEW); await page.click("button.primary"); await page.waitForURL((u) => !u.pathname.startsWith("/login"));
+  check("The NEW password works", !page.url().includes("/login"));
+
+  // restore, keeping other devices signed in this time
+  check("Changing back (without signing others out)", (await changePw(NEW, OLD, OLD, false)).includes("Password changed."));
+}
+
 // Intermittent React #418 hydration error (~1–4% of fast loads, also in the previously deployed build; React recovers on its own) → only reported, doesn't fail the test.
 const hydration = jsErrors.filter((e) => /#418/.test(e)), real = jsErrors.filter((e) => !/#418/.test(e));
 if (hydration.length) console.log(`NOTE  ${hydration.length} intermittent React hydration warning(s) (#418), known upstream flake`);

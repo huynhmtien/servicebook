@@ -9,12 +9,11 @@
 import { readFileSync, writeFileSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
-const PLACEHOLDER = "REPLACE_WITH_YOUR_D1_ID";
 const cfg = JSON.parse(readFileSync("wrangler.jsonc", "utf8").replace(/^\s*\/\/.*$/gm, ""));
 if (cfg.name !== "servicebook") { console.error(`Refusing to deploy: wrangler.jsonc has name="${cfg.name}", it must be "servicebook".`); process.exit(1); }
 
 const id = process.env.SERVICEBOOK_D1_ID;
-if (!id && String(cfg.d1_databases?.[0]?.database_id) === PLACEHOLDER) {
+if (!id && !cfg.d1_databases?.[0]?.database_id) {
   console.error("No database id: set SERVICEBOOK_D1_ID=<id> (see SETUP.md, step 2) and run again.");
   process.exit(1);
 }

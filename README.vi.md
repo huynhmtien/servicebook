@@ -5,6 +5,8 @@
 
 **Sổ bảo dưỡng ô tô tự host.** Báo hạng mục nào sắp/đã tới hạn (theo km **hoặc** thời gian, cái nào tới trước), đọc phiếu bảo dưỡng bằng AI để bạn khỏi gõ tay, theo dõi chi phí và so sánh giá giữa các garage. Chạy **miễn phí** trên Cloudflare Workers + D1 trong tài khoản của chính bạn — không cần máy chủ, dữ liệu là của bạn.
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/huynhmtien/servicebook)
+
 🇬🇧 [English](README.md) · 📖 [Hướng dẫn cài đặt](HUONG-DAN.md) · [Setup guide](SETUP.md)
 
 ## Tính năng
@@ -27,6 +29,12 @@
 
 ## Cài đặt nhanh
 
+### Dễ nhất: một cú bấm (không cần terminal)
+
+Bấm nút **Deploy to Cloudflare** ở trên. Cloudflare sao chép repo vào GitHub của bạn, tạo database, hỏi hai giá trị — `APP_PASSWORD` (mật khẩu bạn dùng để đăng nhập) và `SESSION_SECRET` (một đoạn chữ ngẫu nhiên dài) — rồi build và triển khai. Mở địa chỉ nhận được, đăng nhập, rồi dán khóa AI / Telegram ở **Cài đặt** (không cần dòng lệnh). Mọi thứ chạy trong tài khoản Cloudflare miễn phí của chính bạn.
+
+### Từ terminal
+
 Muốn dùng tên miền riêng: xem [Dùng tên miền riêng](HUONG-DAN.md#dùng-tên-miền-riêng).
 
 Cần Node 22+ và tài khoản Cloudflare miễn phí. Chi tiết ở **[HUONG-DAN.md](HUONG-DAN.md)**:
@@ -36,13 +44,13 @@ npm ci
 npx wrangler login
 npx wrangler d1 create servicebook            # in ra database_id
 export SERVICEBOOK_D1_ID=<database_id>
-# đặt APP_PASSWORD, SESSION_SECRET, CRON_SECRET (+ một khóa AI) vào secrets.env, rồi:
+# đặt APP_PASSWORD và SESSION_SECRET vào secrets.env, rồi:
 npm run release -- --secrets-file secrets.env
 ```
 
 ## Cấu hình
 
-Bí mật (secret của Worker / `.dev.vars` khi chạy thử — xem [`.dev.vars.example`](.dev.vars.example)). Khóa AI và Telegram có thể **dán thẳng vào Cài đặt → Tích hợp & khóa API** (mã hóa trong database, không hiển thị lại); secret của Worker luôn được ưu tiên hơn khóa lưu trong app. `APP_PASSWORD` + `SESSION_SECRET` (đăng nhập), `CRON_SECRET`, một trong `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` / `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`.
+Bí mật (secret của Worker / `.dev.vars` khi chạy thử — xem [`.dev.vars.example`](.dev.vars.example)). Khóa AI và Telegram có thể **dán thẳng vào Cài đặt → Tích hợp & khóa API** (mã hóa trong database, không hiển thị lại); secret của Worker luôn được ưu tiên hơn khóa lưu trong app. `APP_PASSWORD` + `SESSION_SECRET` (đăng nhập; sau lần đăng nhập đầu có thể đổi mật khẩu ở **Cài đặt → Mật khẩu**), tùy chọn `CRON_SECRET`, và (nếu không dán trong app) một trong `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` / `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`.
 
 Tùy chọn (trong app, mục **Cài đặt**): ngôn ngữ, tiền tệ, đơn vị quãng đường, tên thuế, múi giờ, giờ nhắc hằng ngày.
 

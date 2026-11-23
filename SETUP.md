@@ -4,6 +4,18 @@ ServiceBook runs entirely on Cloudflare — **Workers** (web), **D1** (data), **
 
 You need: Node 22+, a Cloudflare account, and (optional) an AI key and a Telegram bot.
 
+## Easiest: the "Deploy to Cloudflare" button
+
+On the repository page press **Deploy to Cloudflare**. In the setup page that opens:
+1. Connect your GitHub (or GitLab) account — Cloudflare copies the repository there.
+2. Keep or rename the Worker and the database.
+3. Fill in the two secrets: **`APP_PASSWORD`** (the password you will sign in with) and **`SESSION_SECRET`** (any long random text, 40+ characters; keep a copy).
+4. Deploy. Cloudflare builds (`npm run build`), creates the database, applies the migrations and publishes (`npm run deploy`).
+
+Open the address shown at the end, sign in with `APP_PASSWORD`, then follow the checklist on the home screen (Settings → language/currency/units, **Integrations & API keys** for AI and Telegram). Updating later: sync your copy with the original repository and Cloudflare redeploys automatically.
+
+The rest of this page is for installing from a terminal.
+
 ## 1. Install and sign in
 
 ```bash
@@ -22,13 +34,13 @@ The id is **not** stored in the repository. `npm run release` substitutes it fro
 
 ## 3. Prepare secrets
 
-Create `secrets.env` (never commit it — `*.env` is git-ignored). Only three values are needed here:
+Create `secrets.env` (never commit it — `*.env` is git-ignored). Only two values are needed here:
 
 ```
 APP_PASSWORD=choose-a-strong-password
 SESSION_SECRET=<openssl rand -hex 32>
-CRON_SECRET=<openssl rand -hex 24>
 ```
+(`CRON_SECRET` is optional: the hourly cron authenticates with a secret derived from `SESSION_SECRET`.)
 
 **AI and Telegram keys are entered later in the app** (Settings → *Integrations & API keys*): paste them in, no command line. They are stored encrypted in your database (AES-GCM, key derived from `SESSION_SECRET`) and are never shown again — only a masked tail like `••••2345`. This works only when `APP_PASSWORD` and `SESSION_SECRET` are set. If you prefer, you can still set them as Worker secrets (`GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`); a Worker secret always wins over a key saved in the app.
 
@@ -94,6 +106,16 @@ Cloudflare creates the DNS record and certificate automatically. Optional: `SERV
 
 On the vehicle page: *Look up … (AI web search)* proposes the manufacturer's schedule with sources, or photograph the maintenance table in the owner's manual. You approve each line; nothing is applied automatically.
 
+## Change or recover the password
+
+**Settings → Password**: enter the current password and a new one (at least 8 characters). Tick *Sign out all other devices* to end every other session at once (they are signed out within seconds). The new password is stored in the database as a salted PBKDF2 hash (peppered with `SESSION_SECRET`); after that the `APP_PASSWORD` secret is only a fallback.
+
+**Forgot it?** Either delete the stored hash so `APP_PASSWORD` works again:
+```bash
+npx wrangler d1 execute servicebook --remote --command "DELETE FROM settings WHERE key='pw_hash'"
+```
+(use your own database name / `--config` with your database id), or set a new `APP_PASSWORD` secret and then run the same command. Changing `SESSION_SECRET` also invalidates the stored hash — run the command above in that case.
+
 ## Backup and restore
 
 Settings → **Download backup** (JSON) and **Export slips (CSV)**. To restore on any ServiceBook instance: Settings → *Restore from backup* → choose the file. Restore **replaces** all current vehicles, slips and intervals. A file that isn't a valid backup is rejected before anything is deleted.
@@ -132,6 +154,7 @@ Never edit an old migration. Add `migrations/000N_name.sql` and run `npm run db:
 
 ## Troubleshooting
 
+- **Locked out after changing `SESSION_SECRET`**: the stored password hash depends on it — delete the hash (see [Change or recover the password](#change-or-recover-the-password)).
 - **"Missing SESSION_SECRET"** after login: set `SESSION_SECRET` (and redeploy, or re-run with `--secrets-file`).
 - **Open `/api/health`** (signed in) to see which settings are present and whether the database responds.
 - **Scanning says no AI key**: paste one in Settings → Integrations & API keys.

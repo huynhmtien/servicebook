@@ -5,6 +5,8 @@
 
 **A self-hosted maintenance log for your cars.** It tells you what is due (by distance **or** time, whichever comes first), reads service receipts with AI so you don't type them, tracks what you spend, and compares prices between garages. It runs **for free** on Cloudflare Workers + D1, in your own account — no server to manage, and your data stays yours.
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/huynhmtien/servicebook)
+
 🇻🇳 [Tiếng Việt](README.vi.md) · 📖 [Setup guide](SETUP.md) · [Hướng dẫn cài đặt](HUONG-DAN.md)
 
 ## Features
@@ -27,6 +29,12 @@
 
 ## Quick start
 
+### Easiest: one click (no terminal)
+
+Press **Deploy to Cloudflare** above. Cloudflare copies this repository into your GitHub account, creates the database, asks for two values — `APP_PASSWORD` (the password you will sign in with) and `SESSION_SECRET` (any long random text) — then builds and deploys it. Open the address it gives you, sign in, and paste your AI / Telegram keys in **Settings** (no command line needed). Everything runs in your own free Cloudflare account.
+
+### From a terminal
+
 Requires Node 22+ and a free Cloudflare account. Full steps in **[SETUP.md](SETUP.md)**; the short version:
 
 ```bash
@@ -34,7 +42,7 @@ npm ci
 npx wrangler login
 npx wrangler d1 create servicebook            # prints database_id
 export SERVICEBOOK_D1_ID=<database_id>
-# put APP_PASSWORD, SESSION_SECRET, CRON_SECRET (+ an AI key) in secrets.env, then:
+# put APP_PASSWORD and SESSION_SECRET in secrets.env, then:
 npm run release -- --secrets-file secrets.env
 ```
 
@@ -46,8 +54,8 @@ Secrets (Worker secrets / `.dev.vars` locally — see [`.dev.vars.example`](.dev
 
 | Variable | Purpose |
 |---|---|
-| `APP_PASSWORD` + `SESSION_SECRET` | Turn on login. Set both; strongly recommended since the app has a public URL. |
-| `CRON_SECRET` | Protects `/api/cron`, called every hour by the Cron Trigger. |
+| `APP_PASSWORD` + `SESSION_SECRET` | Turn on login. Set both; strongly recommended since the app has a public URL. After the first sign-in you can change the password in **Settings → Password** (stored as a salted hash; the Worker secret is then only a fallback). |
+| `CRON_SECRET` | Optional. The hourly cron call authenticates with a secret derived from `SESSION_SECRET` by default. |
 | `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` / `ANTHROPIC_API_KEY` | Enable receipt scanning — one is enough. `AI_PROVIDER` picks one when several are set. |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Enable Telegram reminders and odometer replies. |
 

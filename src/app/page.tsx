@@ -53,6 +53,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     <>
       <div className="titlebar"><h1>{t("dash.title")}</h1><Link href="/settings" className="icon-btn" aria-label={t("common.settings")}><Icon n="gear" s={24} /></Link></div>
 
+      {!process.env.APP_PASSWORD && <Flash text={t("warn.no_password")} />}
       <Flash text={error} />
       <Flash text={ok} ok />
 

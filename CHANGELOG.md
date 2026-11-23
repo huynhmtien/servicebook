@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.0 — 2026-11-23
+- **Change password in the app** (Settings → Password): current + new password, optional *Sign out all other devices* (session epoch, effective within seconds). Stored as a salted PBKDF2 hash peppered with `SESSION_SECRET`; `APP_PASSWORD` becomes a fallback. Rate-limited like sign-in. Recovery steps in SETUP.md.
+- **"Deploy to Cloudflare" button**: one click creates the database and asks for two values (`APP_PASSWORD`, `SESSION_SECRET`). `package.json` now has `build` / `deploy` / `db:migrations:apply` scripts (migrations by binding name); `database_id` removed from `wrangler.jsonc` (auto-provisioned); `.dev.vars.example` lists only the two required secrets.
+- `CRON_SECRET` is no longer needed: the hourly cron authenticates with a secret derived from `SESSION_SECRET` (an explicit `CRON_SECRET` still works).
+
 ## 1.3.0 — 2026-11-23
 - **UI/UX and accessibility pass** (login to every screen, light and dark, phone and desktop): axe-core WCAG 2.2 AA violations went from dozens to zero on 36 page/theme/viewport combinations.
   - Contrast: separate button-fill and text/icon accent colors (≥ 4.5:1 in both themes); active tab label readable; native controls follow the theme (`color-scheme`).

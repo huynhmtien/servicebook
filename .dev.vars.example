@@ -1,21 +1,8 @@
-# Copy to .dev.vars for local runs (npm run preview). In production use `wrangler secret put NAME` or --secrets-file.
-# Language, currency, distance unit, tax label, time zone and reminder hour are NOT configured here: use the in-app Settings page.
+# Used when you run locally (copy to .dev.vars) and as the list of secrets the "Deploy to Cloudflare" button asks for.
+# Language, currency, units, tax label, time zone, reminder hour: Settings page in the app.
+# AI keys (Gemini / Anthropic / DeepSeek) and Telegram token + chat id: also pasted in the app, Settings -> Integrations & API keys.
 
-# Login (set both; with APP_PASSWORD but no SESSION_SECRET the app refuses all access)
+# The password you sign in with (can be changed later in Settings -> Password)
 APP_PASSWORD=
-SESSION_SECRET=      # long random string: openssl rand -hex 32
-
-# Protects the hourly cron endpoint (random string: openssl rand -hex 24)
-CRON_SECRET=
-
-# AI keys and Telegram settings can ALSO be pasted in the app (Settings → Integrations & API keys) instead of here.
-# AI slip reading: ONE key is enough. With several keys, set AI_PROVIDER=gemini|claude|deepseek
-GEMINI_API_KEY=
-ANTHROPIC_API_KEY=
-DEEPSEEK_API_KEY=
-AI_PROVIDER=
-# Optional model overrides: GEMINI_MODEL, DEEPSEEK_MODEL, CLAUDE_MODEL
-
-# Telegram reminders: create a bot with @BotFather for the token; get your chat id from @userinfobot
-TELEGRAM_BOT_TOKEN=
-TELEGRAM_CHAT_ID=
+# Any long random text (40+ characters). Signs login sessions, encrypts API keys saved in the app. openssl rand -hex 32
+SESSION_SECRET=

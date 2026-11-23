@@ -4,6 +4,18 @@ ServiceBook chạy hoàn toàn trên Cloudflare — **Workers** (web), **D1** (d
 
 Cần: Node 22+, tài khoản Cloudflare, và (tùy chọn) khóa AI, bot Telegram.
 
+## Dễ nhất: nút "Deploy to Cloudflare"
+
+Trên trang repo bấm **Deploy to Cloudflare**. Trong trang cài đặt hiện ra:
+1. Kết nối tài khoản GitHub (hoặc GitLab) — Cloudflare sao chép repo vào đó.
+2. Giữ hoặc đổi tên Worker và database.
+3. Điền hai secret: **`APP_PASSWORD`** (mật khẩu bạn dùng để đăng nhập) và **`SESSION_SECRET`** (một đoạn chữ ngẫu nhiên dài, từ 40 ký tự; hãy giữ lại một bản).
+4. Deploy. Cloudflare build (`npm run build`), tạo database, áp dụng migration và xuất bản (`npm run deploy`).
+
+Mở địa chỉ hiện ở cuối, đăng nhập bằng `APP_PASSWORD`, rồi làm theo danh sách ở trang chủ (Cài đặt → ngôn ngữ/tiền tệ/đơn vị, **Tích hợp & khóa API** cho AI và Telegram). Cập nhật sau này: đồng bộ bản sao của bạn với repo gốc, Cloudflare tự triển khai lại.
+
+Phần còn lại của trang này dành cho cài từ terminal.
+
 ## 1. Cài đặt và đăng nhập
 
 ```bash
@@ -22,13 +34,13 @@ Mã này **không** nằm trong repo. `npm run release` lấy từ biến `SERVI
 
 ## 3. Chuẩn bị bí mật
 
-Tạo `secrets.env` (đừng commit — `*.env` đã được git bỏ qua). Ở đây chỉ cần ba giá trị:
+Tạo `secrets.env` (đừng commit — `*.env` đã được git bỏ qua). Ở đây chỉ cần hai giá trị:
 
 ```
 APP_PASSWORD=mat-khau-manh-cua-ban
 SESSION_SECRET=<openssl rand -hex 32>
-CRON_SECRET=<openssl rand -hex 24>
 ```
+(`CRON_SECRET` là tùy chọn: cron mỗi giờ tự xác thực bằng secret suy ra từ `SESSION_SECRET`.)
 
 **Khóa AI và Telegram nhập sau, ngay trong app** (Cài đặt → *Tích hợp & khóa API*): chỉ việc dán, không cần dòng lệnh. Khóa được mã hóa trong database của bạn (AES-GCM, khóa dẫn từ `SESSION_SECRET`) và không bao giờ hiển thị lại — chỉ thấy đuôi che như `••••2345`. Chỉ lưu được khi đã đặt `APP_PASSWORD` và `SESSION_SECRET`. Nếu thích, vẫn đặt được dưới dạng secret của Worker (`GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`); secret của Worker luôn được ưu tiên hơn khóa lưu trong app.
 
@@ -94,6 +106,16 @@ Cloudflare tự tạo DNS và chứng chỉ. Tùy chọn: `SERVICEBOOK_DISABLE_W
 
 Ở trang xe: *Tra cứu theo … (AI tìm trên web)* đề xuất lịch bảo dưỡng của hãng kèm nguồn, hoặc chụp bảng bảo dưỡng trong sổ hướng dẫn. Bạn duyệt từng dòng; không có gì tự áp dụng.
 
+## Đổi hoặc lấy lại mật khẩu
+
+**Cài đặt → Mật khẩu**: nhập mật khẩu hiện tại và mật khẩu mới (từ 8 ký tự). Tích *Đăng xuất mọi thiết bị khác* để kết thúc ngay mọi phiên khác (chúng bị đăng xuất trong vài giây). Mật khẩu mới được lưu trong database dưới dạng băm PBKDF2 có muối (trộn thêm `SESSION_SECRET`); từ đó secret `APP_PASSWORD` chỉ còn là dự phòng.
+
+**Quên mật khẩu?** Xóa mã băm đã lưu để `APP_PASSWORD` dùng lại được:
+```bash
+npx wrangler d1 execute servicebook --remote --command "DELETE FROM settings WHERE key='pw_hash'"
+```
+(dùng tên database của bạn / `--config` có id database). Hoặc đặt secret `APP_PASSWORD` mới rồi chạy lệnh trên. Đổi `SESSION_SECRET` cũng làm mã băm đã lưu mất hiệu lực — khi đó cũng chạy lệnh trên.
+
 ## Sao lưu và khôi phục
 
 Cài đặt → **Tải bản sao lưu** (JSON) và **Xuất phiếu (CSV)**. Khôi phục trên bất kỳ bản ServiceBook nào: Cài đặt → *Khôi phục từ bản sao lưu* → chọn file. Khôi phục **thay thế** toàn bộ xe, phiếu, chu kỳ hiện có. File không phải bản sao lưu hợp lệ sẽ bị từ chối trước khi xóa bất cứ thứ gì.
@@ -112,6 +134,7 @@ Không sửa migration cũ. Thêm `migrations/000N_ten.sql` rồi `npm run db:mi
 
 ## Khi gặp sự cố
 
+- **Bị khóa sau khi đổi `SESSION_SECRET`**: mã băm mật khẩu đã lưu phụ thuộc vào nó — xóa mã băm (xem [Đổi hoặc lấy lại mật khẩu](#đổi-hoặc-lấy-lại-mật-khẩu)).
 - **Báo thiếu `SESSION_SECRET`** sau khi đăng nhập: đặt `SESSION_SECRET` (rồi deploy lại hoặc chạy lại với `--secrets-file`).
 - Mở **`/api/health`** (đã đăng nhập) để xem cấu hình nào đã có và database có phản hồi không.
 - **Quét phiếu báo chưa có khóa AI**: dán một khóa ở Cài đặt → Tích hợp & khóa API.

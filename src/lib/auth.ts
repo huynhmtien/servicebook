@@ -22,17 +22,20 @@ export async function passwordMatches(input: string, real: string): Promise<bool
   return safeEqual(await hmac("servicebook-pw", input), await hmac("servicebook-pw", real));
 }
 
-/** Login session: `expiry.signature`. The signing key is SESSION_SECRET (independent of the password → a leaked cookie can't be reversed into the password). */
-export async function makeSession(secret: string, now = Date.now()): Promise<string> {
+/**
+ * Login session: `expiry.epoch.signature`. The signing key is SESSION_SECRET (independent of the password → a leaked cookie
+ * can't be reversed into the password). `epoch` is a counter stored in the database: bumping it signs everyone out.
+ */
+export async function makeSession(secret: string, epoch = 0, now = Date.now()): Promise<string> {
   const exp = Math.floor(now / 1000) + SESSION_DAYS * 86400;
-  return `${exp}.${await hmac(secret, `servicebook:${exp}`)}`;
+  return `${exp}.${epoch}.${await hmac(secret, `servicebook:${exp}:${epoch}`)}`;
 }
 
-export async function verifySession(token: string | undefined, secret: string, now = Date.now()): Promise<boolean> {
+export async function verifySession(token: string | undefined, secret: string, epoch = 0, now = Date.now()): Promise<boolean> {
   if (!token) return false;
-  const [exp, sig] = token.split(".");
-  if (!exp || !sig || !/^\d+$/.test(exp) || Number(exp) * 1000 < now) return false;
-  return safeEqual(sig, await hmac(secret, `servicebook:${exp}`));
+  const [exp, ep, sig] = token.split(".");
+  if (!exp || !ep || !sig || !/^\d+$/.test(exp) || !/^\d+$/.test(ep) || Number(exp) * 1000 < now || Number(ep) !== epoch) return false;
+  return safeEqual(sig, await hmac(secret, `servicebook:${exp}:${ep}`));
 }
 
 /** Only allow redirecting back to internal paths. */

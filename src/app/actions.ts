@@ -1,7 +1,9 @@
 "use server";
 import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
-import { AUTH_COOKIE, SESSION_DAYS, makeSession, passwordMatches, safeNext } from "../lib/auth.ts";
+import { AUTH_COOKIE, SESSION_DAYS, makeSession, safeNext } from "../lib/auth.ts";
+import { bumpEpoch, checkPassword, getEpoch, setPassword } from "../lib/credentials.ts";
+import { MIN_PASSWORD_LENGTH, passwordProblem } from "../lib/password.ts";
 import { revalidatePath } from "next/cache";
 import { all, get, run, insert, batch, type Stmt } from "../lib/db.ts";
 import { createVehicle, getVehicle, setOdo, setOdoStmts, upsertGarage } from "../lib/queries.ts";
@@ -372,29 +374,56 @@ export async function restoreAction(f: FormData) {
 
 const MAX_FAILS = 8, LOCK_MS = 15 * 60_000;
 
-export async function login(f: FormData) {
-  const pw = process.env.APP_PASSWORD;
-  const secret = process.env.SESSION_SECRET;
-  const next = safeNext(String(f.get("next") ?? "/"));
-  if (!pw) redirect(next);
-  const back = (e: string) => redirect(`/login?error=${e}&next=${encodeURIComponent(next)}`);
-  if (!secret) back("config");
-  const ip = (await headers()).get("cf-connecting-ip") ?? "local";
-  const rec = await get<{ n: number; last_at: number }>("SELECT n, last_at FROM login_fails WHERE ip = ?", ip);
-  if (rec && rec.n >= MAX_FAILS && Date.now() - rec.last_at < LOCK_MS) back("locked");
-  if (!(await passwordMatches(String(f.get("password") ?? ""), pw))) {
-    await run(
-      `INSERT INTO login_fails (ip, n, last_at) VALUES (?, 1, ?)
-       ON CONFLICT (ip) DO UPDATE SET n = CASE WHEN ? - last_at > ? THEN 1 ELSE n + 1 END, last_at = ?`,
-      ip, Date.now(), Date.now(), LOCK_MS, Date.now());
-    await new Promise((r) => setTimeout(r, 500)); // slow down password guessing
-    back("1");
-  }
-  await run("DELETE FROM login_fails WHERE ip = ?", ip);
-  (await cookies()).set(AUTH_COOKIE, await makeSession(secret!), {
+const clientKey = async (prefix: string) => `${prefix}${(await headers()).get("cf-connecting-ip") ?? "local"}`;
+const isLocked = async (key: string) => {
+  const rec = await get<{ n: number; last_at: number }>("SELECT n, last_at FROM login_fails WHERE ip = ?", key);
+  return !!rec && rec.n >= MAX_FAILS && Date.now() - rec.last_at < LOCK_MS;
+};
+const recordFail = async (key: string) => {
+  await run(
+    `INSERT INTO login_fails (ip, n, last_at) VALUES (?, 1, ?)
+     ON CONFLICT (ip) DO UPDATE SET n = CASE WHEN ? - last_at > ? THEN 1 ELSE n + 1 END, last_at = ?`,
+    key, Date.now(), Date.now(), LOCK_MS, Date.now());
+  await new Promise((r) => setTimeout(r, 500)); // slow down password guessing
+};
+/** Issue the session cookie for the CURRENT epoch (so it survives only until the next "sign out everywhere"). */
+const issueSession = async () => {
+  (await cookies()).set(AUTH_COOKIE, await makeSession(process.env.SESSION_SECRET!, await getEpoch()), {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * SESSION_DAYS,
   });
+};
+
+export async function login(f: FormData) {
+  const next = safeNext(String(f.get("next") ?? "/"));
+  if (!process.env.APP_PASSWORD) redirect(next);
+  const back = (e: string) => redirect(`/login?error=${e}&next=${encodeURIComponent(next)}`);
+  if (!process.env.SESSION_SECRET) back("config");
+  const key = await clientKey("");
+  if (await isLocked(key)) back("locked");
+  if (!(await checkPassword(String(f.get("password") ?? "")))) { await recordFail(key); back("1"); }
+  await run("DELETE FROM login_fails WHERE ip = ?", key);
+  await issueSession();
   redirect(next);
+}
+
+/** Change the password from Settings (needs the current one). Optionally signs out every other device. */
+export async function changePasswordAction(f: FormData) {
+  const { t } = await getI18n();
+  const back = (m: string): never => fail("/settings#password", m);
+  if (!process.env.APP_PASSWORD || !process.env.SESSION_SECRET) return back(t("login.config"));
+  const key = await clientKey("pw:");
+  if (await isLocked(key)) return back(t("login.locked"));
+  const cur = String(f.get("current") ?? ""), next = String(f.get("new") ?? ""), again = String(f.get("confirm") ?? "");
+  if (!(await checkPassword(cur))) { await recordFail(key); return back(t("set.pw_wrong")); }
+  if (next !== again) return back(t("set.pw_mismatch"));
+  const problem = passwordProblem(next, cur);
+  if (problem === "short") return back(t("set.pw_short", { min: MIN_PASSWORD_LENGTH }));
+  if (problem === "same") return back(t("set.pw_same"));
+  await run("DELETE FROM login_fails WHERE ip = ?", key);
+  await setPassword(next);
+  if (f.get("signout_all")) await bumpEpoch(); // every other device must sign in again
+  await issueSession(); // this device stays signed in
+  done("/settings#password", t(f.get("signout_all") ? "set.pw_changed_all" : "set.pw_changed"));
 }
 
 export async function logout() {

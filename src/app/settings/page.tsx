@@ -4,7 +4,9 @@ import { getI18n } from "../../lib/settings.ts";
 import { LANGS, LANG_CODES } from "../../lib/i18n/index.ts";
 import Icon from "../components/Icon";
 import { Flash } from "../components/ui";
-import { logout, restoreAction, saveKeysAction, saveSettingsAction } from "../actions";
+import { changePasswordAction, logout, restoreAction, saveKeysAction, saveSettingsAction } from "../actions";
+import PasswordField from "../components/PasswordField";
+import { MIN_PASSWORD_LENGTH } from "../../lib/password.ts";
 import { canStoreKeys, keyStatuses } from "../../lib/secrets.ts";
 import ConfirmButton from "../components/ConfirmButton";
 import TelegramPanel from "../components/TelegramPanel";
@@ -105,6 +107,23 @@ export default async function Settings({ searchParams }: { searchParams: Promise
         <Row on={!!process.env.APP_PASSWORD} label={t("set.row_password")} hint={t("set.row_password_hint")} />
       </div>
       <TelegramPanel />
+
+      {process.env.APP_PASSWORD && process.env.SESSION_SECRET && (
+        <>
+          <h2 id="password">{t("set.pw_title")}</h2>
+          <form action={changePasswordAction} className="card form">
+            <p className="mute" style={{ margin: 0, gridColumn: "1/-1" }}>{t("set.pw_intro")}</p>
+            <div className="field"><label htmlFor="pw_current">{t("set.pw_current")}</label><PasswordField id="pw_current" name="current" /></div>
+            <div className="field"><label htmlFor="pw_new">{t("set.pw_new")}</label><PasswordField id="pw_new" name="new" autoComplete="new-password" minLength={MIN_PASSWORD_LENGTH} />
+              <div className="mute">{t("set.pw_hint", { min: MIN_PASSWORD_LENGTH })}</div></div>
+            <div className="field"><label htmlFor="pw_confirm">{t("set.pw_confirm")}</label><PasswordField id="pw_confirm" name="confirm" autoComplete="new-password" minLength={MIN_PASSWORD_LENGTH} /></div>
+            <label style={{ margin: 0, display: "flex", gap: 10, alignItems: "center", gridColumn: "1/-1", color: "var(--text)", fontSize: 16 }}>
+              <input type="checkbox" name="signout_all" defaultChecked /> {t("set.pw_signout_all")}
+            </label>
+            <button className="btn primary" type="submit">{t("set.pw_save")}</button>
+          </form>
+        </>
+      )}
 
       <h2>{t("set.backup_title")}</h2>
       <div className="card">
