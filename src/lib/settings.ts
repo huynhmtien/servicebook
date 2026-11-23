@@ -7,16 +7,16 @@ import { makeFmt, type DistanceUnit, type Fmt } from "./format.ts";
 import { setTz } from "./util.ts";
 
 export interface Settings {
-  /** Giá trị đã lưu: một ngôn ngữ cụ thể hoặc "auto" (theo trình duyệt). */
+  /** Saved value: a specific language or "auto" (follow the browser). */
   langSetting: Lang | "auto";
-  /** Ngôn ngữ đang dùng (đã giải quyết "auto"). */
+  /** Language in use (with "auto" resolved). */
   lang: Lang;
   currency: string;
   distance: DistanceUnit;
   taxLabel: string;
   timezone: string;
   reminderHour: number;
-  /** Người dùng đã tự mở Cài đặt và lưu (chứ không phải mặc định đoán lần đầu). */
+  /** The user opened Settings and saved (as opposed to the first-run guessed defaults). */
   confirmed: boolean;
 }
 
@@ -27,12 +27,12 @@ const REGION_CURRENCY: Record<string, string> = {
 };
 const MILE_REGIONS = new Set(["US", "GB", "LR", "MM"]);
 
-/** Giá trị mặc định lần chạy đầu, đoán từ trình duyệt/vị trí của người mở app đầu tiên. */
+/** First-run defaults, guessed from the browser/location of whoever opens the app first. */
 function firstRunDefaults(acceptLanguage: string | null) {
   const lang = detectLang(acceptLanguage);
   const region = detectRegion(acceptLanguage);
   let tz = lang === "vi" ? "Asia/Ho_Chi_Minh" : "UTC";
-  try { tz = (getCloudflareContext().cf as { timezone?: string } | undefined)?.timezone || tz; } catch { /* ngoài request */ }
+  try { tz = (getCloudflareContext().cf as { timezone?: string } | undefined)?.timezone || tz; } catch { /* outside a request */ }
   return {
     lang: "auto",
     currency: (region && REGION_CURRENCY[region]) || (lang === "vi" ? "VND" : "USD"),
@@ -46,15 +46,15 @@ function firstRunDefaults(acceptLanguage: string | null) {
 const VALID_CURRENCY = (c: string) => { try { new Intl.NumberFormat("en", { style: "currency", currency: c }); return true; } catch { return false; } };
 const VALID_TZ = (z: string) => { try { new Intl.DateTimeFormat("en", { timeZone: z }); return true; } catch { return false; } };
 
-/** Đọc cài đặt (lần đầu thì tự tạo mặc định). Gọi nhiều lần trong một request chỉ truy vấn một lần. */
+/** Read settings (created with defaults on first use). Calling it several times in one request queries only once. */
 export const getSettings = cache(async (): Promise<Settings> => {
   let rows = await all<{ key: string; value: string }>("SELECT key, value FROM settings");
   let m = Object.fromEntries(rows.map((r) => [r.key, r.value]));
   let al: string | null = null;
-  try { al = (await headers()).get("accept-language"); } catch { /* cron / ngoài request */ }
+  try { al = (await headers()).get("accept-language"); } catch { /* cron / outside a request */ }
   if (!m.currency) {
     const d = firstRunDefaults(al);
-    // chỉ chốt mặc định khi yêu cầu đến từ trình duyệt thật (có Accept-Language); cron/health-check không được quyết định thay người dùng
+    // only lock in defaults when the request comes from a real browser (has Accept-Language); cron/health-checks must not decide for the user
     if (al) {
       for (const [k, v] of Object.entries(d)) await run("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", k, v);
       rows = await all("SELECT key, value FROM settings");
@@ -67,7 +67,7 @@ export const getSettings = cache(async (): Promise<Settings> => {
   else if (al) {
     lang = detectLang(al);
     if (m.detected_lang !== lang) await run("INSERT INTO settings (key, value) VALUES ('detected_lang', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", lang);
-  } else lang = isLang(m.detected_lang) ? m.detected_lang : "en"; // cron: dùng ngôn ngữ lần mở app gần nhất
+  } else lang = isLang(m.detected_lang) ? m.detected_lang : "en"; // cron: use the language from the most recent app open
   const timezone = VALID_TZ(m.timezone) ? m.timezone : "UTC";
   setTz(timezone);
   return {
@@ -80,7 +80,7 @@ export const getSettings = cache(async (): Promise<Settings> => {
 
 export interface I18n { t: T; fmt: Fmt; lang: Lang; settings: Settings }
 
-/** Hàm dịch + bộ định dạng cho request hiện tại (server). */
+/** Translation function + formatter for the current request (server). */
 export async function getI18n(): Promise<I18n> {
   const settings = await getSettings();
   const locale = LANGS[settings.lang].locale;

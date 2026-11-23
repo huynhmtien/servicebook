@@ -25,7 +25,7 @@ function buildMessage(items: { vehicle: string; plate: string | null; odo: numbe
 
 export type DigestResult = { status: "sent" | "none" | "not_configured" | "error"; error?: string };
 
-/** Gửi tổng hợp hằng ngày: mọi mục quá hạn / sắp tới. `force`: gửi cả tin "mọi thứ ổn". */
+/** Send the daily summary: all overdue / upcoming items. `force`: also send an "all good" message. */
 export async function sendDigest(force = false): Promise<DigestResult> {
   if (!telegramConfigured()) return { status: "not_configured" };
   const i18n = await getI18n();
@@ -44,7 +44,7 @@ export async function sendDigest(force = false): Promise<DigestResult> {
   return r.ok ? { status: "sent" } : { status: "error", error: r.error };
 }
 
-/** Gửi ngay khi có mục mới chuyển trạng thái (sắp tới / quá hạn); mỗi mức chỉ báo một lần. */
+/** Send immediately when an item newly changes status (upcoming / overdue); each level is reported only once. */
 export async function notifyEscalations(): Promise<void> {
   if (!telegramConfigured()) return;
   const i18n = await getI18n();
@@ -61,7 +61,7 @@ export async function notifyEscalations(): Promise<void> {
     for (const r2 of i.rows) await run("INSERT INTO notifications (key) VALUES (?) ON CONFLICT DO NOTHING", escKey(r2));
 }
 
-/** Nhắc cập nhật ODO nếu lần ghi cuối đã quá 14 ngày (mỗi xe tối đa một lần / 7 ngày). Cảnh báo theo km chỉ đúng khi ODO được cập nhật. */
+/** Remind to update ODO if the last entry is over 14 days old (at most once per 7 days per vehicle). Km-based warnings are only accurate when ODO is kept up to date. */
 async function nudgeOdometer(): Promise<void> {
   if (!telegramConfigured()) return;
   const i18n = await getI18n();
@@ -75,14 +75,14 @@ async function nudgeOdometer(): Promise<void> {
   }
 }
 
-/** Giờ hiện tại (0–23) theo múi giờ cài đặt. */
+/** Current hour (0–23) in the configured time zone. */
 function localHour(tz: string): number {
   return Number(new Date().toLocaleString("en-GB", { hour: "2-digit", hour12: false, timeZone: tz })) % 24;
 }
 
 /**
- * Cron chạy MỖI GIỜ (Cron Trigger): báo mức mới; sau giờ nhắc (cài đặt) thì gửi tổng hợp, mỗi ngày một lần.
- * Cũng dọn bản nháp quét dở quá 7 ngày và lịch sử đăng nhập sai cũ.
+ * Cron runs EVERY HOUR (Cron Trigger): reports new levels; after the reminder hour (setting) it sends the summary, once per day.
+ * Also cleans up unfinished scan drafts older than 7 days and old failed-login history.
  */
 export async function runDaily(): Promise<string> {
   const { settings } = await getI18n();

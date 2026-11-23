@@ -7,7 +7,7 @@ import { safeEqual } from "./auth.ts";
 import { today } from "./util.ts";
 import { parseOdoMessage, type V } from "./odo-parse.ts";
 
-/** Khóa bí mật của webhook: suy ra từ SESSION_SECRET (hoặc CRON_SECRET) nên không cần cấu hình thêm. */
+/** Webhook secret key: derived from SESSION_SECRET (or CRON_SECRET) so no extra configuration is needed. */
 export async function webhookSecret(): Promise<string | null> {
   const base = process.env.SESSION_SECRET || process.env.CRON_SECRET;
   if (!base) return null;
@@ -21,7 +21,7 @@ export async function verifyWebhook(headerValue: string | null): Promise<boolean
   return !!s && !!headerValue && safeEqual(headerValue, s);
 }
 
-/** Xử lý một tin nhắn Telegram gửi tới bot. Chỉ nhận từ đúng TELEGRAM_CHAT_ID của chủ app. */
+/** Handle a Telegram message sent to the bot. Only accepted from the app owner's TELEGRAM_CHAT_ID. */
 export async function handleTelegramUpdate(update: { message?: { chat?: { id?: number | string }; text?: string } }): Promise<void> {
   const msg = update.message;
   const chatId = String(process.env.TELEGRAM_CHAT_ID ?? "").trim().replace(/^["']|["']$/g, "");

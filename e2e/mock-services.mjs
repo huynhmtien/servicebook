@@ -1,10 +1,10 @@
-// Telegram + Gemini giả để kiểm thử E2E không cần khóa thật.
-// Đổi chế độ Telegram: GET /__mode/ok | badtoken | nochat ; xem log: GET /__log
+// Fake Telegram + Gemini for E2E testing without real keys.
+// Switch Telegram mode: GET /__mode/ok | badtoken | nochat ; view the log: GET /__log
 import http from "node:http";
 let mode = "ok";
 const log = [];
-const bodies = []; // thân yêu cầu (để kiểm tra nội dung tin nhắn/webhook)
-// Phiếu mặc định: AI đọc nhầm 1 dòng thừa, bỏ sót VAT; "Lọc gió cabin" AI không phân loại được (từ khóa sẽ nhận ra)
+const bodies = []; // request bodies (to check message/webhook content)
+// Default record: the AI misreads 1 extra row and misses VAT; the AI can't classify "Lọc gió cabin" (keywords will recognize it)
 const BASE = { garage: "Toyota Tân Cảng", date: "2026-09-20", odo: 49500, discount: 0, vat: 0, vat_rate: null, vat_included: false };
 const GOOD = [
   { raw_name: "Dầu động cơ 0W20 (4L)", qty: 4, amount: 800000, kind: "part", part_type_id: 2, confidence: 0.95 },
@@ -36,7 +36,7 @@ http.createServer((req, res) => {
     log.push(`${req.method} ${url}`);
     bodies.push({ url, body: b });
     if (url.includes(":generateContent")) {
-      if (b.includes("google_search")) // tra cứu web: có kèm nguồn (grounding)
+      if (b.includes("google_search")) // web lookup: includes sources (grounding)
         return j(200, { candidates: [{ content: { parts: [{ text: "```json\n" + JSON.stringify(INTERVALS) + "\n```" }] },
           groundingMetadata: { groundingChunks: [{ web: { uri: "https://example.com/toyota-fortuner-lich-bao-duong", title: "Lịch bảo dưỡng Fortuner" } }] } }] });
       if (b.includes("MAINTENANCE INTERVAL TABLE")) return j(200, { candidates: [{ content: { parts: [{ text: JSON.stringify({ ...INTERVALS, items: INTERVALS.items.slice(0, 2).map((x) => ({ ...x, source_url: null, confidence: "high" })) }) }] } }] });

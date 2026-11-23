@@ -9,7 +9,7 @@ async function hmac(secret: string, msg: string): Promise<string> {
   return hex(await crypto.subtle.sign("HMAC", key, enc.encode(msg)));
 }
 
-/** So sánh chuỗi không phụ thuộc thời gian (tránh dò từng ký tự). */
+/** Constant-time string comparison (prevents character-by-character guessing). */
 export function safeEqual(a: string, b: string): boolean {
   const x = enc.encode(a), y = enc.encode(b);
   let d = x.length ^ y.length;
@@ -17,12 +17,12 @@ export function safeEqual(a: string, b: string): boolean {
   return d === 0;
 }
 
-/** So khớp mật khẩu qua HMAC hai phía → độ dài/nội dung mật khẩu không lộ qua thời gian xử lý. */
+/** Match the password via HMAC on both sides → password length/content doesn't leak through processing time. */
 export async function passwordMatches(input: string, real: string): Promise<boolean> {
   return safeEqual(await hmac("servicebook-pw", input), await hmac("servicebook-pw", real));
 }
 
-/** Phiên đăng nhập: `hạn.chữ-ký`. Khóa ký là SESSION_SECRET (độc lập với mật khẩu → cookie lộ cũng không dò ngược ra mật khẩu). */
+/** Login session: `expiry.signature`. The signing key is SESSION_SECRET (independent of the password → a leaked cookie can't be reversed into the password). */
 export async function makeSession(secret: string, now = Date.now()): Promise<string> {
   const exp = Math.floor(now / 1000) + SESSION_DAYS * 86400;
   return `${exp}.${await hmac(secret, `servicebook:${exp}`)}`;
@@ -35,5 +35,5 @@ export async function verifySession(token: string | undefined, secret: string, n
   return safeEqual(sig, await hmac(secret, `servicebook:${exp}`));
 }
 
-/** Chỉ cho phép quay về đường dẫn nội bộ. */
+/** Only allow redirecting back to internal paths. */
 export const safeNext = (n: string | null | undefined) => (n && n.startsWith("/") && !n.startsWith("//") ? n : "/");

@@ -18,7 +18,7 @@ test("ép kiểu, bỏ linh kiện lạ / trùng / không có số, chuẩn hóa
   }, new Set([2, 3, 4, 5]), meta);
   assert.equal(p.items.length, 2);
   assert.deepEqual(p.items[0], { part_type_id: 2, interval_km: 10000, interval_months: 12, note: "bình thường", source_url: "https://toyota.com.vn/x", confidence: "high" });
-  assert.equal(p.items[1].source_url, null); // URL không phải http(s) bị loại
+  assert.equal(p.items[1].source_url, null); // URLs that aren't http(s) are dropped
   assert.equal(p.items[1].confidence, "medium");
 });
 

@@ -3,7 +3,7 @@ import { getI18n } from "../../../lib/settings.ts";
 
 export const dynamic = "force-dynamic";
 
-/** Xuất toàn bộ phiếu dạng CSV. Đã được middleware bảo vệ bằng đăng nhập. */
+/** Export all records as CSV. Protected by login via the middleware. */
 export async function GET() {
   const { fmt } = await getI18n();
   const name = `servicebook-slips-${new Date().toISOString().slice(0, 10)}.csv`;

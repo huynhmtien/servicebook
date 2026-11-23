@@ -1,7 +1,7 @@
 import { runDaily } from "../../../lib/notify.ts";
 import { safeEqual } from "../../../lib/auth.ts";
 
-/** Cron Trigger của Cloudflare gọi mỗi ngày (xem wrangler.jsonc + worker.ts). Bảo vệ bằng CRON_SECRET. */
+/** Called by the Cloudflare Cron Trigger daily (see wrangler.jsonc + worker.ts). Protected by CRON_SECRET. */
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || !safeEqual(req.headers.get("authorization") ?? "", `Bearer ${secret}`))

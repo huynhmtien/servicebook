@@ -1,6 +1,6 @@
 import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 
-// khi chạy `npm run dev`: cho phép dùng D1/R2 cục bộ (wrangler mô phỏng)
+// when running `npm run dev`: allow using local D1/R2 (emulated by wrangler)
 initOpenNextCloudflareForDev();
 
 /** @type {import('next').NextConfig} */

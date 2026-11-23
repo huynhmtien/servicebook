@@ -5,8 +5,8 @@ import { I18nProvider } from "./components/I18nProvider";
 import { LANGS } from "../lib/i18n/index.ts";
 import { getI18n } from "../lib/settings.ts";
 
-// Metadata tĩnh (không truy vấn DB): generateMetadata bất đồng bộ làm Next stream metadata và gây lỗi hydrate (React #418).
-// Tiêu đề/mô tả theo ngôn ngữ được render bằng thẻ <title>/<meta> gốc ở layout bên dưới (React 19 tự đưa vào <head>).
+// Static metadata (no DB query): async generateMetadata makes Next stream the metadata and causes a hydration error (React #418).
+// The language-specific title/description is rendered with native <title>/<meta> tags in the layout below (React 19 hoists them into <head>).
 export const metadata = {
   applicationName: "ServiceBook",
   appleWebApp: { capable: true, title: "ServiceBook", statusBarStyle: "default" as const },

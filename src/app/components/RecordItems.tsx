@@ -21,7 +21,7 @@ const blankRow = (): Row => ({ key: ++seq, name: "", part: "", kind: "part", qty
 
 const HINT_CLS: Record<Exclude<Hint, "">, string> = { memory: "b-ok", ai: "b-unknown", keyword: "b-soon", low: "b-soon" };
 
-/** Danh sách hạng mục + phần tiền (giảm giá, thuế, tổng). Tổng cập nhật ngay khi sửa/xóa dòng. `amount` lưu theo đơn vị nhỏ nhất của loại tiền. */
+/** Item list + money section (discount, tax, total). The total updates immediately when a row is edited/removed. `amount` is stored in the smallest unit of the currency. */
 export default function RecordItems({ parts, initial, blank, money: m0 = {} }: { parts: Part[]; initial: ItemInit[]; blank: number; money?: MoneyInit }) {
   const { t, fmt } = useI18n();
   const money = fmt.money, toNum = fmt.parse;
@@ -44,7 +44,7 @@ export default function RecordItems({ parts, initial, blank, money: m0 = {} }: {
   const disc = toNum(discount);
   const base = Math.max(0, sum - disc);
   const rateN = Number(String(rate).replace(",", ".")) || 0;
-  // có thuế suất và chưa tự gõ tiền thuế → tự tính lại khi thêm/xóa dòng
+  // has a tax rate and the tax amount wasn't typed manually → recompute when rows are added/removed
   const vatAuto = mode === "in" ? Math.round((base * rateN) / (100 + rateN)) : vatFromRate(base, rateN);
   const vat = mode === "none" ? 0 : vatTyped != null ? toNum(vatTyped) : rateN > 0 ? vatAuto : 0;
   const total = expectedTotal({ sum, discount: disc, vat, vatIncluded: mode === "in" });

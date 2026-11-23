@@ -1,5 +1,5 @@
 :root{
-  /* Bảng màu theo iOS (System Colors / Grouped Background) */
+  /* iOS-style palette (System Colors / Grouped Background) */
   --outer:#e5e5ea;--bg:#f2f2f7;--surface:#fff;--text:#000;--mute:#6c6c70;--line:#d1d1d6;--line2:#c7c7cc;--fill:#e9e9ee;
   --primary:#007aff;--primary-h:#0062cc;--on-primary:#fff;--primary-soft:#e5f0ff;--link:#0062cc;
   --red:#c4161c;--red-bg:#ffe5e3;--amber:#8a4b00;--amber-bg:#fff0d1;--green:#1b6b35;--green-bg:#dff5e5;--gray:#555a63;--gray-bg:#ececf1;
@@ -44,7 +44,7 @@ h2{font-size:13px;margin:24px 0 8px 16px;color:var(--mute);text-transform:upperc
 .sub{color:var(--mute);margin:0 0 16px;font-size:15px}
 .mute{color:var(--mute);font-size:14px}
 
-/* thẻ & danh sách */
+/* cards & lists */
 .card{background:var(--surface);border-radius:var(--r);padding:16px;margin-bottom:16px}
 .card.flat{box-shadow:none}
 .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
@@ -59,7 +59,7 @@ a.li::after{content:"";width:8px;height:14px;flex:none;opacity:.4;background:cur
 .li .r{text-align:right;white-space:nowrap}
 .stat{font-size:28px;font-weight:700;letter-spacing:-.01em;line-height:1.2}
 
-/* trạng thái: luôn có icon + chữ, không chỉ dựa vào màu */
+/* status: always icon + text, never color alone */
 .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px 3px 7px;border-radius:99px;font-size:13px;font-weight:600;white-space:nowrap}
 .b-overdue{background:var(--red-bg);color:var(--red)}.b-soon{background:var(--amber-bg);color:var(--amber)}
 .b-info{background:var(--primary-soft);color:var(--link)}
@@ -71,7 +71,7 @@ a.li::after{content:"";width:8px;height:14px;flex:none;opacity:.4;background:cur
 .hero.bad{background:var(--red-bg);color:var(--red)}.hero.warn{background:var(--amber-bg);color:var(--amber)}.hero.good{background:var(--green-bg);color:var(--green)}
 .hero .big{font-size:20px;font-weight:700;line-height:1.3}
 
-/* form: chữ 16px để iPhone không tự phóng to, vùng chạm >= 44px */
+/* form: 16px text so iPhone doesn't auto-zoom, touch target >= 44px */
 input,select,textarea,button{font:inherit;color:inherit;background:var(--surface);border:1px solid var(--line2);border-radius:10px;padding:10px 12px;min-height:44px;max-width:100%;-webkit-appearance:none;appearance:none}
 select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%238e8e93' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:34px}
 input:focus,select:focus{border-color:var(--primary)}
@@ -92,14 +92,14 @@ label{display:block;font-size:14px;color:var(--mute);margin-bottom:4px;font-weig
 .field input,.field select{width:100%}
 .num{width:120px}
 
-/* dòng hạng mục trên phiếu: dạng thẻ, dùng tốt trên điện thoại */
+/* item rows on a record: card style, works well on phones */
 .item{border-radius:12px;padding:14px;margin-bottom:12px;display:grid;gap:10px;grid-template-columns:1fr 1fr 1fr;background:var(--surface)}
 .item .full{grid-column:1/-1}
 .item input,.item select{width:100%}
 .item.empty{opacity:.75}
 @media(max-width:520px){.item{grid-template-columns:1fr 1fr}.item .full,.item .amt{grid-column:1/-1}}
 
-/* dòng cấu hình theo linh kiện */
+/* per-part configuration row */
 .rule{display:grid;gap:10px 14px;grid-template-columns:28px 1fr auto;align-items:center;padding:14px 16px;position:relative}
 .rule .iv-box{grid-column:2/-1}
 .rule .iv-box>summary{cursor:pointer;min-height:28px;font-size:14px}
@@ -114,7 +114,7 @@ label{display:block;font-size:14px;color:var(--mute);margin-bottom:4px;font-weig
 .step.done .n{background:var(--green-bg);color:var(--green)}
 .step.done .t{color:var(--mute);text-decoration:line-through}
 
-/* biểu đồ cột */
+/* bar chart */
 .bars{display:flex;align-items:flex-end;gap:6px;height:130px}
 .bars>div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;min-width:0}
 .bars i{display:block;width:100%;background:var(--primary);border-radius:6px 6px 0 0;min-height:3px;opacity:.9}

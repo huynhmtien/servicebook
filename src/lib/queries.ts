@@ -25,7 +25,7 @@ export const listPartTypes = async (): Promise<PartTypeKw[]> =>
     .sort((a, b) => categoryRank(a.category) - categoryRank(b.category) || a.id - b.id)
     .map((p) => ({ ...p, kw: keywordsFor(p.name) }));
 
-/** Linh kiện không áp dụng cho từng loại nhiên liệu (tự tắt theo dõi khi tạo xe; bật lại được trong trang xe). */
+/** Parts that don't apply to each fuel type (tracking is auto-disabled when creating a vehicle; can be re-enabled on the vehicle page). */
 const NOT_APPLICABLE: Record<string, string[]> = {
   diesel: ["spark_plugs"],
   electric: ["engine_oil", "oil_filter", "air_filter", "fuel_filter", "spark_plugs", "drive_belt", "injector_cleaning"],
@@ -36,7 +36,7 @@ export async function createVehicle(v: Omit<Vehicle, "id">, opts: { distance: Di
     "INSERT INTO vehicles (name, plate, model, year, odo, fuel) VALUES (?,?,?,?,?,?)",
     v.name, v.plate, v.model, v.year, v.odo, v.fuel,
   );
-  // chu kỳ mặc định tính theo km; nếu dùng dặm thì quy đổi và làm tròn tới 500
+  // default intervals are in km; if using miles, convert and round to 500
   const km = opts.distance === "mi" ? "CAST(ROUND(default_km * 0.621371 / 500.0) * 500 AS INTEGER)" : "default_km";
   const off = NOT_APPLICABLE[v.fuel ?? ""] ?? [];
   await batch([
@@ -49,8 +49,8 @@ export async function createVehicle(v: Omit<Vehicle, "id">, opts: { distance: Di
 }
 
 /**
- * Cập nhật odo hiện tại và ghi lịch sử (một transaction).
- * Phiếu cũ (ODO thấp hơn) không được kéo ODO hiện tại lùi; người dùng tự nhập/sửa thì được (override).
+ * Update the current odo and record history (one transaction).
+ * An old record (lower ODO) must not pull the current ODO backwards; a manual user entry/edit may (override).
  */
 export const setOdoStmts = (vehicleId: number, km: number, date = today(), override = false): Stmt[] => [
   ["INSERT INTO odometer_logs (vehicle_id, km, date) VALUES (?,?,?)", vehicleId, km, date],
@@ -79,7 +79,7 @@ export async function vehicleRules(vehicleId: number): Promise<RuleRow[]> {
      FROM rules r JOIN part_types p ON p.id = r.part_type_id WHERE r.vehicle_id = ?
      ORDER BY p.id`, vehicleId,
   );
-  // một truy vấn cho mọi linh kiện (trước đây: 1 truy vấn / linh kiện → ~40 lần mỗi lần mở trang)
+  // one query for all parts (previously: 1 query per part → ~40 per page load)
   const lastRows = await all<{ part_type_id: number; date: string; odo: number | null; garage: string | null; amount: number }>(
     `SELECT part_type_id, date, odo, garage, amount FROM (
        SELECT i.part_type_id, s.date, s.odo, g.name AS garage, i.amount,

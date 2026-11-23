@@ -15,7 +15,7 @@ import { getI18n, saveSettings } from "../lib/settings.ts";
 import { restoreBackup } from "../lib/backup.ts";
 import { INITIAL_NOTE, normName, today } from "../lib/util.ts";
 
-/** Quay lại trang kèm thông báo "đã xong" để người dùng luôn thấy phản hồi. */
+/** Go back to the page with a "done" notice so the user always sees feedback. */
 const done = (path: string, msg: string): never => {
   const sep = path.includes("?") ? "&" : "?";
   redirect(`${path}${sep}ok=${encodeURIComponent(msg)}`);
@@ -27,14 +27,14 @@ const fail = (path: string, msg: string): never => {
 };
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
-/** Số nguyên (ODO, km, tháng, năm): bỏ mọi dấu phân cách nghìn kiểu vi/en (48.500 / 48,500 / 48 500). */
+/** Integer (ODO, km, months, year): strips any vi/en thousands separators (48.500 / 48,500 / 48 500). */
 const n = (f: FormData, k: string): number | null => {
   const v = s(f, k).replace(/[^\d-]/g, "");
   if (v === "" || v === "-") return null;
   const x = Number(v);
   return Number.isFinite(x) ? x : null;
 };
-/** Số thập phân (số lượng, thuế suất): chấp nhận dấu , hoặc . */
+/** Decimal number (quantity, tax rate): accepts either , or . */
 const dec = (f: FormData, k: string): number | null => {
   const v = s(f, k).replace(/\s/g, "").replace(",", ".");
   if (v === "") return null;
@@ -99,7 +99,7 @@ export async function saveRules(f: FormData) {
     "SELECT id, interval_km, interval_months FROM rules WHERE vehicle_id = ?", vid)) {
     const km = n(f, `km_${r.id}`), mo = n(f, `mo_${r.id}`);
     const changed = km !== r.interval_km || mo !== r.interval_months;
-    // người dùng tự sửa số → đánh dấu nguồn "người dùng tự đặt" (hết nhãn mặc định/AI)
+    // user edited the number manually → mark the source as "set by user" (clears the default/AI label)
     stmts.push([
       `UPDATE rules SET interval_km = ?, interval_months = ?, enabled = ?${changed ? ", source = 'user', source_note = NULL, source_url = NULL" : ""} WHERE id = ?`,
       km, mo, f.get(`on_${r.id}`) ? 1 : 0, r.id]);
@@ -109,7 +109,7 @@ export async function saveRules(f: FormData) {
   done(`/vehicles/${vid}`, t("act.intervals_saved"));
 }
 
-/** Tra cứu chu kỳ chuẩn theo dòng xe (AI tìm web) → màn hình duyệt. */
+/** Look up standard intervals for the vehicle model (AI web search) → review screen. */
 export async function researchIntervalsAction(f: FormData) {
   const i18n = await getI18n();
   const { t } = i18n;
@@ -127,7 +127,7 @@ export async function researchIntervalsAction(f: FormData) {
   redirect(`/vehicles/${vid}/intervals/${id}`);
 }
 
-/** Đọc bảng bảo dưỡng chụp từ sổ hướng dẫn → màn hình duyệt. */
+/** Read the maintenance table photographed from the owner's manual → review screen. */
 export async function scanIntervalDoc(f: FormData) {
   const i18n = await getI18n();
   const { t } = i18n;
@@ -139,7 +139,7 @@ export async function scanIntervalDoc(f: FormData) {
   let id: number;
   try {
     if (!supportedMime(mime)) return fail(`/vehicles/${vid}`, t("act.bad_mime"));
-    const p = await extractIntervalsFromDoc({ id: vid }, buf, mime, aiContext(i18n)); // ảnh chỉ gửi cho AI đọc, không lưu
+    const p = await extractIntervalsFromDoc({ id: vid }, buf, mime, aiContext(i18n)); // the image is only sent to the AI to read, not stored
     id = await insert("INSERT INTO drafts (vehicle_id, data) VALUES (?,?)", vid, JSON.stringify(p));
   } catch (e) {
     return fail(`/vehicles/${vid}`, t("act.doc_failed", { detail: e instanceof Error ? e.message : String(e) }).slice(0, 400));
@@ -147,7 +147,7 @@ export async function scanIntervalDoc(f: FormData) {
   redirect(`/vehicles/${vid}/intervals/${id}`);
 }
 
-/** Áp dụng các dòng người dùng đã duyệt. */
+/** Apply the rows the user has approved. */
 export async function applyIntervals(f: FormData) {
   const { t } = await getI18n();
   const vid = Number(f.get("vehicle_id"));
@@ -172,7 +172,7 @@ export async function applyIntervals(f: FormData) {
   done(`/vehicles/${vid}`, applied ? t("act.intervals_applied", { count: applied }) : t("act.intervals_none"));
 }
 
-/** Dữ liệu ban đầu: mỗi linh kiện nhập lần thay gần nhất (ngày + km). */
+/** Initial data: for each part, enter the most recent replacement (date + km). */
 export async function saveSetup(f: FormData) {
   const { t } = await getI18n();
   const vid = Number(f.get("vehicle_id"));
@@ -203,7 +203,7 @@ export async function saveSetup(f: FormData) {
 
 const ROWS = 40;
 
-/** Lưu một phiếu (dùng cho nhập tay và duyệt kết quả scan). */
+/** Save a record (used for manual entry and for reviewing scan results). */
 export async function saveRecord(f: FormData) {
   const { t, fmt } = await getI18n();
   const vid = Number(f.get("vehicle_id"));
@@ -214,7 +214,7 @@ export async function saveRecord(f: FormData) {
   for (let i = 0; i < ROWS; i++) {
     const raw = s(f, `name_${i}`);
     if (!raw) continue;
-    const amount = fmt.parse(s(f, `amount_${i}`)); // đơn vị nhỏ nhất của loại tiền
+    const amount = fmt.parse(s(f, `amount_${i}`)); // smallest unit of the currency
     items.push({
       raw, part: n(f, `part_${i}`), qty: dec(f, `qty_${i}`) || 1, amount,
       kind: s(f, `kind_${i}`) === "labor" ? "labor" : "part",
@@ -230,7 +230,7 @@ export async function saveRecord(f: FormData) {
   const vatRate = dec(f, "vat_rate");
   const vatIncluded = s(f, "vat_included") === "1";
   const total = expectedTotal({ sum: subtotal, discount, vat, vatIncluded });
-  // giá từng dòng quy về trước thuế để so sánh giữa các garage cho công bằng
+  // convert each line's price to pre-tax so garages can be compared fairly
   const factor = netFactor(vatRate, vatIncluded);
   const draftId = n(f, "draft_id");
 
@@ -251,9 +251,9 @@ export async function saveRecord(f: FormData) {
   if (odo != null) stmts.push(...setOdoStmts(vid, odo, date));
   if (draftId) stmts.push(["DELETE FROM drafts WHERE id = ?", draftId]);
   try {
-    await batch(stmts); // các hạng mục + ODO + xóa bản nháp: một transaction
+    await batch(stmts); // items + ODO + draft deletion: one transaction
   } catch (e) {
-    await run("DELETE FROM service_records WHERE id = ?", id); // không để lại phiếu rỗng
+    await run("DELETE FROM service_records WHERE id = ?", id); // don't leave an empty record behind
     throw e;
   }
   await notifyEscalations();
@@ -281,7 +281,7 @@ export async function scanSlip(f: FormData) {
   if (!supportedMime(mime)) err(t("act.bad_mime"));
   let id: number;
   try {
-    const draft = await extractSlip(buf, mime, aiContext(i18n)); // ảnh chỉ gửi cho AI đọc, không lưu
+    const draft = await extractSlip(buf, mime, aiContext(i18n)); // the image is only sent to the AI to read, not stored
     id = await insert("INSERT INTO drafts (vehicle_id, data) VALUES (?,?)", vid, JSON.stringify(draft));
   } catch (e) {
     console.error("[servicebook] scan failed:", e);
@@ -305,7 +305,7 @@ export async function sendDigestNow(_prev: TgState, _f: FormData): Promise<TgSta
   return { ok: false, message: r.status === "not_configured" ? t("tg.not_configured") : r.error ?? "" };
 }
 
-/** Bật nhận tin trả lời từ bot (cập nhật ODO bằng tin nhắn). */
+/** Enable receiving replies from the bot (update ODO via message). */
 export async function enableTelegramReplies(_prev: TgState, _f: FormData): Promise<TgState> {
   const { t } = await getI18n();
   const secret = await webhookSecret();
@@ -319,7 +319,7 @@ export async function enableTelegramReplies(_prev: TgState, _f: FormData): Promi
   return r.ok ? { ok: true, message: t("tg.webhook_ok") } : { ok: false, message: r.error };
 }
 
-/** Lưu cài đặt chung (ngôn ngữ, tiền tệ, đơn vị, thuế, múi giờ, giờ nhắc). */
+/** Save general settings (language, currency, units, tax, time zone, reminder hour). */
 export async function saveSettingsAction(f: FormData) {
   const before = await getI18n();
   await saveSettings({
@@ -327,12 +327,12 @@ export async function saveSettingsAction(f: FormData) {
     taxLabel: s(f, "tax_label"), timezone: s(f, "timezone"), reminderHour: n(f, "reminder_hour") ?? 8,
   });
   revalidatePath("/", "layout");
-  const { t } = await getI18n(); // dùng ngôn ngữ mới để báo
+  const { t } = await getI18n(); // use the new language for the message
   void before;
   done("/settings", t("set.saved"));
 }
 
-/** Khôi phục toàn bộ dữ liệu từ file sao lưu JSON. */
+/** Restore all data from a JSON backup file. */
 export async function restoreAction(f: FormData) {
   const { t } = await getI18n();
   const file = f.get("file");
@@ -364,7 +364,7 @@ export async function login(f: FormData) {
       `INSERT INTO login_fails (ip, n, last_at) VALUES (?, 1, ?)
        ON CONFLICT (ip) DO UPDATE SET n = CASE WHEN ? - last_at > ? THEN 1 ELSE n + 1 END, last_at = ?`,
       ip, Date.now(), Date.now(), LOCK_MS, Date.now());
-    await new Promise((r) => setTimeout(r, 500)); // làm chậm việc dò mật khẩu
+    await new Promise((r) => setTimeout(r, 500)); // slow down password guessing
     back("1");
   }
   await run("DELETE FROM login_fails WHERE ip = ?", ip);

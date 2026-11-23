@@ -1,11 +1,11 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
-/** Tham số SQL. Tiền/ngày/ID đều là số hoặc chuỗi; null = NULL. */
+/** SQL parameters. Money/dates/IDs are all numbers or strings; null = NULL. */
 export type Param = string | number | null;
-/** Một lệnh trong batch: [câu SQL, ...tham số]. */
+/** One statement in a batch: [SQL, ...params]. */
 export type Stmt = [sql: string, ...params: Param[]];
 
-/** D1 (SQLite) gắn qua binding `DB` trong wrangler.jsonc. Schema nằm ở migrations/ (npm run db:migrate). */
+/** D1 (SQLite) attached via the `DB` binding in wrangler.jsonc. The schema lives in migrations/ (npm run db:migrate). */
 const db = (): D1Database => getCloudflareContext().env.DB;
 
 export async function all<T = Record<string, unknown>>(sql: string, ...p: Param[]): Promise<T[]> {
@@ -17,15 +17,15 @@ export async function get<T = Record<string, unknown>>(sql: string, ...p: Param[
 export async function run(sql: string, ...p: Param[]): Promise<void> {
   await db().prepare(sql).bind(...p).run();
 }
-/** INSERT và trả về id của dòng mới. */
+/** INSERT and return the new row's id. */
 export async function insert(sql: string, ...p: Param[]): Promise<number> {
   const r = await get<{ id: number }>(`${sql} RETURNING id`, ...p);
   return r!.id;
 }
 
 /**
- * Chạy nhiều lệnh trong MỘT transaction (D1 batch: hoặc tất cả thành công, hoặc không lệnh nào).
- * D1 không có transaction tương tác, nên các luồng cần id vừa tạo thì insert() lấy id trước rồi gom phần còn lại vào batch.
+ * Run several statements in ONE transaction (D1 batch: either all succeed or none do).
+ * D1 has no interactive transactions, so flows that need a just-created id call insert() first and then batch the rest.
  */
 export async function batch(stmts: Stmt[]): Promise<void> {
   if (!stmts.length) return;

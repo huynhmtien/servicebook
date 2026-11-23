@@ -2,7 +2,7 @@ import { buildBackup } from "../../../lib/backup.ts";
 
 export const dynamic = "force-dynamic";
 
-/** Tải toàn bộ dữ liệu (JSON). ServiceBook không lưu ảnh phiếu. Đã được middleware bảo vệ bằng đăng nhập. */
+/** Download all data (JSON). ServiceBook doesn't store record images. Protected by login via the middleware. */
 export async function GET() {
   const name = `servicebook-backup-${new Date().toISOString().slice(0, 10)}.json`;
   return new Response(JSON.stringify(await buildBackup(), null, 1), {

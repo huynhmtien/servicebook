@@ -2,7 +2,7 @@ import { ping } from "../../../lib/db.ts";
 
 export const dynamic = "force-dynamic";
 
-/** Trang chẩn đoán: kiểm tra biến cấu hình và kết nối database (không lộ giá trị bí mật). */
+/** Diagnostics page: checks config variables and the database connection (without exposing secret values). */
 export async function GET() {
   const env = process.env;
   const flags = {

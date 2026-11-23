@@ -1,12 +1,14 @@
-# Chính sách bảo mật
+# Security policy
 
-## Báo lỗ hổng
-Vui lòng **không** đăng chi tiết lỗ hổng công khai. Dùng *Security → Report a vulnerability* (báo cáo riêng tư) trên trang GitHub của repo này. Mình sẽ phản hồi trong vài ngày.
+## Reporting a vulnerability
+Please **do not** post vulnerability details publicly. Use *Security → Report a vulnerability* (private reporting) on this repository's GitHub page. You'll get a reply within a few days.
 
-## Phạm vi
-ServiceBook là app tự triển khai: mỗi người chạy bản riêng trên tài khoản Cloudflare của mình. Dữ liệu, mật khẩu và khóa API nằm ở tài khoản của người triển khai, không có máy chủ trung tâm.
+## Scope
+ServiceBook is self-hosted: everyone runs their own copy in their own Cloudflare account. Data, passwords and API keys live in the deployer's account — there is no central server.
 
-## Khuyến nghị cho người triển khai
-- Luôn đặt `APP_PASSWORD` và `SESSION_SECRET` (xem [HUONG-DAN.md](HUONG-DAN.md)); thiếu mật khẩu thì app mở cho mọi người biết địa chỉ.
-- Đặt bí mật bằng `wrangler secret put`, không ghi vào file được commit.
-- Giữ phụ thuộc cập nhật (Dependabot đã bật sẵn trong repo).
+## Recommendations for deployers
+- Always set `APP_PASSWORD` and `SESSION_SECRET` (see [SETUP.md](SETUP.md)); without a password anyone who knows the URL can read and edit the data.
+- Set secrets with `wrangler secret put` or `--secrets-file`, never in files you commit.
+- Receipt photos are not stored, but they are sent to the AI provider you configure (Gemini, DeepSeek or Anthropic) to be read — pick one whose terms you accept.
+- Keep dependencies up to date (Dependabot is enabled in this repository).
+- Download backups regularly (Settings → Backup) and keep them somewhere private: they contain all your vehicle and spending data.

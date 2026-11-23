@@ -25,7 +25,7 @@ test("đọc số tiền: USD (2 chữ số thập phân) nhận diện dấu th
   assert.equal(parseAmount("12,50", 2), 1250);
   assert.equal(parseAmount("1,234.56", 2), 123456);
   assert.equal(parseAmount("1.234,56", 2), 123456);
-  assert.equal(parseAmount("1,234", 2), 123400); // 3 chữ số sau dấu → là nghìn
+  assert.equal(parseAmount("1,234", 2), 123400); // 3 digits after the separator → thousands
   assert.equal(parseAmount("12", 2), 1200);
   assert.equal(parseAmount("0.5", 2), 50);
   assert.equal(parseAmount("-3.20", 2), -320);

@@ -1,4 +1,4 @@
--- ServiceBook: schema D1 (SQLite). Ngày giữ dạng TEXT 'YYYY-MM-DD'; tiền là số nguyên VNĐ.
+-- ServiceBook: D1 (SQLite) schema. Dates are kept as TEXT 'YYYY-MM-DD'; money is an integer in VND.
 CREATE TABLE vehicles (
   id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, plate TEXT, model TEXT, year INTEGER,
   odo INTEGER NOT NULL DEFAULT 0, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
@@ -48,5 +48,5 @@ CREATE TABLE drafts (
 
 CREATE TABLE notifications (key TEXT PRIMARY KEY, sent_at TEXT DEFAULT CURRENT_TIMESTAMP);
 
--- chống dò mật khẩu: đếm lần sai theo địa chỉ IP
+-- brute-force protection: count failed attempts per IP address
 CREATE TABLE login_fails (ip TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0, last_at INTEGER NOT NULL DEFAULT 0);

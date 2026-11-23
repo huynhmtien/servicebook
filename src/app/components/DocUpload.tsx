@@ -3,7 +3,7 @@ import { useState } from "react";
 import { shrinkImage, UPLOAD_LIMIT } from "./shrink";
 import { useI18n } from "./I18nProvider";
 
-/** Tải ảnh/PDF (đã thu nhỏ nếu là ảnh) lên một server action; dùng cho "quét bảng bảo dưỡng trong sổ". */
+/** Upload an image/PDF (downscaled if an image) to a server action; used for "scan the maintenance table in the manual". */
 export default function DocUpload({ vehicleId, action, label, busy }: { vehicleId: number; action: (f: FormData) => void | Promise<void>; label: string; busy: string }) {
   const { t } = useI18n();
   const [msg, setMsg] = useState("");

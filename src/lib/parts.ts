@@ -1,28 +1,28 @@
 import { normName } from "./util.ts";
 
-/** Nhóm linh kiện (khóa ổn định, lưu trong DB; tên hiển thị ở i18n: `cat.<khóa>`). */
+/** Part categories (stable key, stored in the DB; display name in i18n: `cat.<key>`). */
 export const CATEGORIES = ["periodic", "engine", "cooling", "ac", "drivetrain", "brakes", "chassis", "electrical", "documents", "other_costs"] as const;
 export type Category = (typeof CATEGORIES)[number];
 
-/** Nhóm không theo dõi hạn (chỉ để phân loại chi phí). */
+/** Categories without due tracking (only for cost classification). */
 export const COST_ONLY: Category = "other_costs";
-/** Khóa hai mục đặc biệt: công thợ chung và "chưa phân loại". */
+/** Keys of two special entries: general labor and "uncategorized". */
 export const LABOR_KEY = "labor";
 export const GENERIC_KEY = "other";
 
 export type Lang = "en" | "vi";
 export interface DefaultPart {
   key: string; category: Category; km: number | null; months: number | null;
-  /** Tên hiển thị theo ngôn ngữ. `en` cũng là tên lưu trong DB (cột name). */
+  /** Display name by language. `en` is also the name stored in the DB (name column). */
   names: Record<Lang, string>;
-  /** Từ khóa (không dấu) để tự nhận dạng tên hạng mục trên phiếu, theo ngôn ngữ. */
+  /** Keywords (accent-free) to auto-recognize item names on a record, by language. */
   kw: Record<Lang, string[]>;
 }
 
 /**
- * Danh mục linh kiện chuẩn + chu kỳ MẶC ĐỊNH CHUNG cho ô tô phổ thông (km tính theo km; đổi sang dặm khi tạo xe nếu chọn dặm).
- * Đây chỉ là mức tham khảo, chưa xác thực theo từng dòng xe — chu kỳ đúng phải theo sổ hướng dẫn của xe
- * (app có chức năng tra cứu/quét sổ để thay thế).
+ * Standard parts catalog + GENERIC DEFAULT intervals for ordinary cars (km are in km; converted to miles when creating a vehicle if miles are chosen).
+ * These are only reference values, not validated per vehicle model — correct intervals must follow the vehicle's owner's manual
+ * (the app has lookup/manual-scan features to replace them).
  */
 export const DEFAULT_PARTS: DefaultPart[] = [
   { key: "periodic_service", category: "periodic", km: 10000, months: 6,
@@ -125,15 +125,15 @@ export const DEFAULT_PARTS: DefaultPart[] = [
 
 const BY_KEY = new Map(DEFAULT_PARTS.map((p) => [p.key, p]));
 const KW_BY_NAME = new Map(DEFAULT_PARTS.map((p) => [p.names.en, [...p.kw.en, ...p.kw.vi].map(normName)]));
-/** Từ khóa (cả hai ngôn ngữ) của một linh kiện, theo tên lưu trong DB. */
+/** Keywords (both languages) of a part, by the name stored in the DB. */
 export const keywordsFor = (dbName: string): string[] => KW_BY_NAME.get(dbName) ?? [];
-/** Tên hiển thị của linh kiện theo ngôn ngữ (linh kiện tự thêm thì dùng tên đã lưu). */
+/** Display name of a part by language (custom-added parts use their stored name). */
 export const partLabel = (p: { key?: string | null; name: string }, lang: string): string =>
   (p.key && BY_KEY.get(p.key)?.names[lang as Lang]) || p.name;
-/** Thứ tự nhóm để hiển thị. */
+/** Category order for display. */
 export const categoryRank = (c: string): number => { const i = (CATEGORIES as readonly string[]).indexOf(c); return i < 0 ? 99 : i; };
 
-/** Đoán linh kiện từ tên hạng mục (khớp từ khóa dài nhất). Trả về id hoặc null. */
+/** Guess the part from an item name (longest keyword match). Returns an id or null. */
 export function guessPart(raw: string, parts: { id: number; kw: string[] }[]): number | null {
   const n = ` ${normName(raw)} `;
   let best: { id: number; len: number } | null = null;

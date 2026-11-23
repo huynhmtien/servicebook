@@ -1,7 +1,7 @@
 const MAX_SIDE = 1800;
-export const UPLOAD_LIMIT = 3.5 * 1024 * 1024; // ảnh nhỏ hơn → tải lên và AI đọc nhanh hơn
+export const UPLOAD_LIMIT = 3.5 * 1024 * 1024; // smaller images → faster upload and AI reading
 
-/** Thu nhỏ ảnh chụp từ điện thoại trước khi gửi (ảnh gốc 5–10MB sẽ vượt giới hạn upload). */
+/** Downscale phone photos before sending (5–10MB originals would exceed the upload limit). */
 export async function shrinkImage(file: File): Promise<File> {
   if (!file.type.startsWith("image/") || file.size <= 1.2 * 1024 * 1024) return file;
   const bmp = await createImageBitmap(file);

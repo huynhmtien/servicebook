@@ -1,83 +1,100 @@
-# ServiceBook — Sổ bảo dưỡng ô tô
+# ServiceBook
 
-Web app chạy miễn phí trên Cloudflare để quản lý bảo dưỡng xe: nhắc lịch, báo tới hạn linh kiện (theo km **hoặc** thời gian, cái nào tới trước),
-quét phiếu bảo dưỡng bằng AI để tự nhập liệu, lưu lịch sử chi phí và so sánh giá giữa các garage.
+[![CI](https://github.com/huynhmtien/servicebook/actions/workflows/ci.yml/badge.svg)](https://github.com/huynhmtien/servicebook/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## Tính năng
+**A self-hosted maintenance log for your cars.** It tells you what is due (by distance **or** time, whichever comes first), reads service receipts with AI so you don't type them, tracks what you spend, and compares prices between garages. It runs **for free** on Cloudflare Workers + D1, in your own account — no server to manage, and your data stays yours.
 
-- **Dashboard cảnh báo**: đỏ (quá hạn) / vàng (sắp tới) / xanh (ổn), dự kiến ngày tới hạn dựa trên km/ngày thực tế của xe.
-- **Chu kỳ theo từng linh kiện** (23 hạng mục ô tô có sẵn, chỉnh được theo từng xe): tính từ lần thay gần nhất.
-- **Nhập dữ liệu ban đầu**: khai báo lần thay gần nhất của từng hạng mục khi mới thêm xe.
-- **Quét phiếu**: chụp/tải ảnh hoặc PDF phiếu → AI điền sẵn garage, ngày, km, các dòng + tiền → bạn kiểm tra rồi lưu.
-  Ảnh chỉ gửi cho AI đọc rồi bỏ — **không lưu ảnh** ở đâu cả, server chỉ giữ số liệu đã trích. Tên hạng mục đã xác nhận được nhớ cho lần sau.
-- **So sánh chi phí**: theo linh kiện, giữa các garage (TB/thấp/cao/gần nhất), xu hướng tăng/giảm, cờ “đắt hơn mặt bằng”.
-- **Telegram**: tổng hợp cảnh báo hằng ngày + báo ngay khi một hạng mục chuyển sang sắp tới/quá hạn.
+🇻🇳 [Tiếng Việt](README.vi.md) · 📖 [Setup guide](SETUP.md) · [Hướng dẫn cài đặt](HUONG-DAN.md)
 
-> Không rành code? Xem **[HUONG-DAN.md](HUONG-DAN.md)** (hướng dẫn từng bước).
+## Features
 
-## Cách app xử lý phân loại, VAT và chu kỳ
+- **Due-date dashboard** — red (overdue), yellow (due soon), green (ok), with a predicted due date based on how much you actually drive.
+- **Per-part intervals** (about 30 built-in parts, editable per vehicle). Defaults are generic: replace them with your manufacturer's numbers by letting AI search the web (with sources, you approve each line) or by photographing the table in the owner's manual.
+- **Receipt scanning** — photograph or upload a service invoice (any language); the AI fills in garage, date, odometer, line items and amounts; you review and save. **The photo is never stored** — it is sent to the AI provider you configured and then discarded.
+- **Costs & price comparison** — per part, per garage, with trends.
+- **Reminders via Telegram** — daily summary at the hour you choose, instant alerts when something becomes due, a nudge when the odometer is stale — and you can **update the odometer just by texting the bot** (`52000`).
+- **International** — English and Vietnamese UI (add a language by adding one file), any ISO currency (with cents), kilometers or miles, your own tax label (VAT / GST / sales tax) and time zone.
+- **Your data, your control** — one-click JSON backup **and restore**, CSV export of all slips.
+- **Vehicle types** — diesel / petrol / hybrid / electric presets switch off parts that don't apply.
+- **Installable on your phone** (PWA) and password-protected.
 
-- **Phân loại linh kiện (4 lớp, lớp trên thắng):** (1) bộ nhớ những gì anh từng xác nhận → (2) AI đọc phiếu, bắt buộc chọn một mục trong danh mục (có cả nhóm “Chi phí khác”: công thợ, rửa xe, phụ phí…) → (3) bộ từ khóa tiếng Việt (`src/lib/parts.ts`) khi AI không chắc → (4) gõ tên ở form nhập tay thì tự gợi ý. Dòng nào gợi ý/AI chưa chắc đều có nhãn vàng để soát.
-- **VAT & giảm giá:** mỗi phiếu lưu cộng hạng mục, giảm giá, VAT (cộng thêm hoặc đã gồm trong giá), thuế suất; tổng thanh toán tính đúng và đối chiếu với tổng in trên phiếu. AI bỏ sót VAT mà tổng trên phiếu hơn đúng 5/8/10% thì app tự suy ra. Giá từng dòng để so sánh giữa garage được quy về **trước thuế**.
-- **Chu kỳ bảo dưỡng — nguồn gốc con số:** mặc định chỉ là mức tham khảo chung (nhãn “Mặc định chung · chưa xác thực”). Muốn đúng theo xe: (a) **quét bảng bảo dưỡng trong sổ hướng dẫn** (chính xác nhất), hoặc (b) **AI tra cứu web** theo hãng/dòng/năm (Claude `web_search` hoặc Gemini Google Search; DeepSeek không có tìm web), có nguồn, luôn qua bước anh duyệt từng dòng. Mỗi dòng ghi rõ nguồn: Mặc định chung / AI tra cứu / Theo sổ hướng dẫn / Anh tự đặt.
+## How due dates work
 
-## Giao diện & lên iOS
+- Due by distance = odometer at last replacement + interval; due by time = date of last replacement + interval in months. **Whichever comes first applies.**
+- **Due soon**: within 15% of the distance interval (at least 500) or within 30 days. **Overdue**: ≤ 0.
+- Distance alerts are only accurate if the odometer is kept up to date — update it in the app, with each slip, or by texting the Telegram bot.
 
-- Thiết kế mobile-first theo chuẩn iOS (tiêu đề lớn, danh sách nhóm bo góc, thanh tab mờ, vùng chạm ≥ 44pt, chế độ tối, safe-area). Trên màn hình rộng, app hiển thị thành một cột giữa màn hình.
-- **PWA**: có manifest + biểu tượng, cài lên Màn hình chính iPhone (Safari → Chia sẻ → Thêm vào Màn hình chính) chạy toàn màn hình.
-- **Lên App Store (sau này)**: cần tài khoản Apple Developer (99 USD/năm) và máy Mac. Hướng khả thi là bọc bằng Capacitor trỏ tới địa chỉ web này; lưu ý Apple có thể từ chối app chỉ là "web bọc lại" (guideline 4.2), nên cần thêm tính năng gốc (thông báo đẩy, camera/quét tài liệu, widget). Cho dùng cá nhân thì PWA là đủ.
+## Quick start
 
-## Triển khai
+Requires Node 22+ and a free Cloudflare account. Full steps in **[SETUP.md](SETUP.md)**; the short version:
 
-Chạy hoàn toàn trên **Cloudflare** (Workers + D1 + Cron Trigger), gói miễn phí, không cần máy chủ. Xem **[HUONG-DAN.md](HUONG-DAN.md)**.
+```bash
+npm ci
+npx wrangler login
+npx wrangler d1 create servicebook            # prints database_id
+export SERVICEBOOK_D1_ID=<database_id>
+# put APP_PASSWORD, SESSION_SECRET, CRON_SECRET (+ an AI key) in secrets.env, then:
+npm run release -- --secrets-file secrets.env
+```
 
-Phát triển: `npm run dev` (D1 giả lập cục bộ) hoặc `npm run preview` (chạy đúng như trên Cloudflare). Test: `npm test`.
+Open `https://servicebook.<your-subdomain>.workers.dev`, sign in, and follow the quick-start checklist on the home screen.
 
-**Tự kiểm thử như người dùng thật (E2E):** `e2e/run.mjs` mở trình duyệt khổ điện thoại và bấm qua toàn bộ luồng chính
-(đăng nhập, thêm/sửa xe, ODO, chu kỳ, Telegram, quét phiếu → kiểm tra → xóa/thêm dòng → lưu, nhập tay, xóa phiếu, so sánh,
-điều hướng, tràn ngang màn hình, lỗi JS). Dùng `e2e/mock-services.mjs` giả lập Telegram và Gemini nên không cần khóa thật:
-chạy mock, chạy app với `TELEGRAM_API_BASE`/`GEMINI_API_BASE` trỏ vào mock và DB trống, rồi `npm run e2e`
-(cần Playwright; đặt `PW_MODULE` nếu cài ở nơi khác). Mỗi lần sửa lỗi nên thêm một mục kiểm tra vào đây.
+## Configuration
 
-## Cấu hình (secret của Worker; chạy thử trên máy thì ghi vào `.dev.vars`, xem `.dev.vars.example`)
+Secrets (Worker secrets / `.dev.vars` locally — see [`.dev.vars.example`](.dev.vars.example)):
 
-| Biến | Ý nghĩa |
+| Variable | Purpose |
 |---|---|
-| `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` / `ANTHROPIC_API_KEY` | Bật quét phiếu — chỉ cần một loại. `AI_PROVIDER` để chọn khi có nhiều khóa; đổi model bằng `GEMINI_MODEL`, `DEEPSEEK_MODEL`, `CLAUDE_MODEL` |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Bật nhắc qua Telegram (thử ở trang Cài đặt) |
-| `APP_PASSWORD` + `SESSION_SECRET` | Bật đăng nhập (đặt cả hai; thiếu `SESSION_SECRET` thì app từ chối mọi truy cập). Nên đặt vì app có địa chỉ công khai |
-| `CRON_SECRET` | Bảo vệ endpoint nhắc hằng ngày `/api/cron` (Cron Trigger tự gọi lúc 8:00 giờ VN) |
-| `APP_TZ` | Múi giờ (mặc định `Asia/Ho_Chi_Minh`) |
+| `APP_PASSWORD` + `SESSION_SECRET` | Turn on login. Set both; strongly recommended since the app has a public URL. |
+| `CRON_SECRET` | Protects `/api/cron`, called every hour by the Cron Trigger. |
+| `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` / `ANTHROPIC_API_KEY` | Enable receipt scanning — one is enough. `AI_PROVIDER` picks one when several are set. |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Enable Telegram reminders and odometer replies. |
 
-## Quy tắc tính tới hạn
+Preferences (in the app, **Settings**): language, currency, distance unit, tax label, time zone, daily reminder hour.
 
-- Hạn theo km = km lần thay cuối + chu kỳ km; hạn theo ngày = ngày thay cuối + chu kỳ tháng. **Cái nào tới trước thì tính.**
-- **Sắp tới**: còn ≤ 15% chu kỳ km (tối thiểu 500 km) hoặc ≤ 30 ngày. **Quá hạn**: ≤ 0.
-- Cảnh báo theo km chỉ đúng khi ODO được cập nhật: nhập ODO mới ở Tổng quan (một chạm) hoặc qua mỗi phiếu.
+## Privacy & security
 
-## Cấu trúc
+- Receipt photos are **not stored**. They are sent to the AI provider you chose (Google Gemini, DeepSeek or Anthropic) only to be read. Choose a provider whose terms you accept.
+- Data lives in **your** Cloudflare D1 database. Download backups regularly (Settings → Backup).
+- Always set `APP_PASSWORD` and `SESSION_SECRET`: without them anyone who knows the URL can read and edit your data. Sessions are signed (HMAC), logins are rate-limited, comparisons are constant-time.
+- Report vulnerabilities privately — see [SECURITY.md](SECURITY.md).
 
-```
-src/lib/rules.ts       tính tới hạn (thuần, có test)
-src/lib/db.ts          lớp truy cập D1 (all/get/run/insert/batch)
-src/lib/queries.ts     truy vấn nghiệp vụ
-src/lib/extract.ts     đọc phiếu bằng AI (Gemini/DeepSeek/Claude, gọi qua fetch)
-src/lib/auth.ts        phiên đăng nhập HMAC, so sánh an toàn thời gian
-src/lib/notify.ts      logic nhắc Telegram; Cron Trigger gọi api/cron qua worker.ts
-src/lib/parts.ts       danh mục linh kiện + chu kỳ mặc định
-src/app/               giao diện + server actions
-migrations/            schema D1 (npm run db:migrate)
-worker.ts              điểm vào Worker (web + cron)
+## Development
+
+```bash
+npm ci && npm run types            # generate Cloudflare binding types
+npm run dev                        # Next.js dev server with local D1
+npm run preview                    # build and run exactly like production (wrangler dev)
+npx tsc --noEmit && npm test       # typecheck + unit tests
 ```
 
-## Giấy phép
+End-to-end tests drive a real browser (Playwright) against a local worker with mocked Telegram/Gemini: `e2e/run.mjs` (Vietnamese flows) and `e2e/smoke-en.mjs` (English / international flows). See [SETUP.md](SETUP.md#running-the-end-to-end-tests).
 
-MIT — xem [LICENSE](LICENSE). Đóng góp: [CONTRIBUTING.md](CONTRIBUTING.md). Lịch sử thay đổi: [CHANGELOG.md](CHANGELOG.md).
+```
+src/lib/rules.ts        due-date logic (pure, unit-tested)
+src/lib/i18n/           messages (en.ts is the source of truth), translator with plurals
+src/lib/format.ts       money / number / date / distance formatting and parsing
+src/lib/settings.ts     app-wide settings (language, currency, units, time zone)
+src/lib/db.ts           D1 access layer (all / get / run / insert / batch)
+src/lib/extract.ts      receipt reading (Gemini / DeepSeek / Claude via fetch)
+src/lib/intervals.ts    interval lookup (AI web search / manual table)
+src/lib/backup.ts       backup, restore and CSV export
+src/lib/notify.ts       Telegram reminders; src/lib/telegram-bot.ts handles replies
+src/lib/parts.ts        part catalog (stable keys, bilingual names and keywords)
+src/app/                UI and server actions
+migrations/             D1 schema (never edit old migrations — add new ones)
+worker.ts               Worker entry (web + cron)
+```
 
-## Bảo mật (repo này công khai)
+## Adding a language
 
-- **Không bao giờ commit bí mật.** `APP_PASSWORD`, `SESSION_SECRET`, `CRON_SECRET` và các khóa AI/Telegram chỉ đặt bằng `wrangler secret put` hoặc file `.dev.vars` / `secrets.env` (đã nằm trong `.gitignore`). Repo chỉ có `.dev.vars.example` với ô trống.
-- **Luôn đặt `APP_PASSWORD` + `SESSION_SECRET`** trước khi mở app ra internet: không có mật khẩu thì ai biết địa chỉ cũng xem và sửa được dữ liệu.
-- `database_id` trong `wrangler.jsonc` chỉ là mã định danh, không phải khóa truy cập; muốn dùng cho tài khoản của bạn thì thay bằng ID của database bạn tự tạo (xem [HUONG-DAN.md](HUONG-DAN.md)).
-- Ảnh phiếu không được lưu; dữ liệu nằm trong D1 của tài khoản Cloudflare của chủ app. Nên tải sao lưu định kỳ ở trang Cài đặt.
-- Phát hiện lỗ hổng: xem [SECURITY.md](SECURITY.md).
+1. Copy `src/lib/i18n/en.ts` to `src/lib/i18n/<code>.ts` and translate every value (keep `{placeholders}`; plurals use `_one` / `_other` keys).
+2. Register it in `src/lib/i18n/index.ts` (`LANGS`).
+3. Add names and keywords for the part catalog in `src/lib/parts.ts` (`names` and `kw`).
+4. Add the new code to the `Record<Lang, …>` tables (TypeScript points out each one: part names/keywords, tax rates for AI).
+5. `npm test` checks that every key and placeholder exists.
+
+## License
+
+[MIT](LICENSE) © 2026 TIEN HUYNH. Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Changes: [CHANGELOG.md](CHANGELOG.md).

@@ -1,6 +1,6 @@
 import { all, batch, type Param, type Stmt } from "./db.ts";
 
-/** Cột của từng bảng được sao lưu/khôi phục (danh sách cố định: tên cột không bao giờ lấy từ file người dùng). */
+/** Columns of each table that is backed up/restored (fixed list: column names never come from the user's file). */
 const COLS = {
   garages: ["id", "name", "address", "note"],
   vehicles: ["id", "name", "plate", "model", "year", "odo", "fuel", "created_at"],
@@ -28,15 +28,15 @@ const rowsOf = (d: Record<string, unknown>, t: string): Row[] => {
 };
 
 /**
- * Khôi phục: THAY THẾ toàn bộ xe/phiếu/chu kỳ bằng nội dung file. Kiểm tra toàn vẹn trước khi xóa bất cứ thứ gì.
- * Linh kiện được đối chiếu theo `key` (hoặc tên) nên không phụ thuộc id của bản cài đặt cũ.
+ * Restore: REPLACES all vehicles/records/intervals with the file's contents. Checks integrity before deleting anything.
+ * Parts are matched by `key` (or name), so they don't depend on ids from the old installation.
  */
 export async function restoreBackup(text: string): Promise<{ vehicles: number; records: number }> {
   const j = JSON.parse(text) as { app?: string; version?: number; data?: Record<string, unknown> };
   if (j.app !== "servicebook" || j.version !== 1 || !j.data || typeof j.data !== "object") throw new Error("not a ServiceBook backup");
   const d = j.data;
 
-  // id linh kiện cũ → id hiện tại
+  // old part id → current id
   const cur = await all<{ id: number; key: string | null; name: string }>("SELECT id, key, name FROM part_types");
   const byKey = new Map(cur.filter((c) => c.key).map((c) => [c.key!, c.id]));
   const byName = new Map(cur.map((c) => [c.name, c.id]));
@@ -58,7 +58,7 @@ export async function restoreBackup(text: string): Promise<{ vehicles: number; r
   }
   for (const r of t.service_items) if (!rIds.has(Number(r.record_id))) throw new Error("broken reference: service_items");
 
-  // chuẩn bị dữ liệu đã ánh xạ linh kiện
+  // prepare data with parts mapped
   const rows: Record<Table, Row[]> = { ...t };
   rows.rules = t.rules.map((r) => ({ ...r, part_type_id: mapPart(r.part_type_id) })).filter((r) => r.part_type_id != null);
   rows.service_items = t.service_items.map((r) => ({ ...r, part_type_id: mapPart(r.part_type_id) }));
@@ -72,12 +72,12 @@ export async function restoreBackup(text: string): Promise<{ vehicles: number; r
     const sql = `INSERT INTO ${n} (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`;
     for (const r of rows[n]) stmts.push([sql, ...cols.map((c) => asParam(r[c]))]);
   }
-  // D1 batch theo từng khúc (xóa nằm ở khúc đầu; lỗi giữa chừng → chạy lại cùng file là xong vì luôn xóa trước)
+  // D1 batch in chunks (deletion is in the first chunk; if it fails midway, rerunning the same file fixes it since it always deletes first)
   for (let i = 0; i < stmts.length; i += 300) await batch(stmts.slice(i, i + 300));
   return { vehicles: rows.vehicles.length, records: rows.service_records.length };
 }
 
-/** CSV một dòng mỗi hạng mục (mở được bằng Excel/Sheets). Tiền xuất theo đơn vị chính của loại tiền. */
+/** CSV with one row per item (opens in Excel/Sheets). Money is exported in the currency's major unit. */
 export async function buildCsv(digits: number, currency: string): Promise<string> {
   const rows = await all<{
     date: string; vehicle: string; garage: string | null; odo: number | null; item: string; part: string | null; kind: string;
@@ -91,7 +91,7 @@ export async function buildCsv(digits: number, currency: string): Promise<string
   const major = (n: number) => (n / 10 ** digits).toFixed(digits);
   const q = (v: unknown) => {
     let x = String(v ?? "");
-    if (/^[=+\-@\t\r]/.test(x)) x = "'" + x; // chặn công thức độc hại khi mở bằng Excel
+    if (/^[=+\-@\t\r]/.test(x)) x = "'" + x; // block malicious formulas when opened in Excel
     return /[",\n\r]/.test(x) ? `"${x.replace(/"/g, '""')}"` : x;
   };
   const head = ["date", "vehicle", "garage", "odometer", "item", "part", "kind", "qty", `amount_${currency}`, `unit_price_${currency}`, `slip_total_${currency}`, `discount_${currency}`, `tax_${currency}`];

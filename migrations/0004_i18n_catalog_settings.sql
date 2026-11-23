@@ -1,5 +1,5 @@
--- Quốc tế hóa: linh kiện có khóa ổn định + tên tiếng Anh; nhóm lưu bằng khóa; bảng cài đặt.
--- (Các dòng đã seed bằng tên tiếng Việt ở 0002 được chuyển sang khóa/tên tiếng Anh; tên hiển thị lấy theo ngôn ngữ trong app.)
+-- Internationalization: parts get a stable key + English name; categories are stored by key; settings table.
+-- (Rows seeded with Vietnamese names in 0002 are converted to English keys/names; display names come from the app's language.)
 ALTER TABLE part_types ADD COLUMN key TEXT;
 
 UPDATE part_types SET key = 'periodic_service', name = 'Scheduled service (manufacturer)' WHERE name = 'Bảo dưỡng định kỳ theo hãng';
@@ -48,5 +48,5 @@ UPDATE part_types SET category = 'other_costs' WHERE category = 'Chi phí khác'
 
 CREATE UNIQUE INDEX idx_part_types_key ON part_types(key);
 
--- cài đặt toàn app: ngôn ngữ, tiền tệ, đơn vị quãng đường, múi giờ, giờ nhắc (xem src/lib/settings.ts)
+-- app-wide settings: language, currency, distance unit, time zone, reminder hour (see src/lib/settings.ts)
 CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);

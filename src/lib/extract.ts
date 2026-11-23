@@ -6,9 +6,9 @@ import { parseAmount } from "./format.ts";
 import { LANGS, type Lang, type T } from "./i18n/index.ts";
 import type { I18n } from "./settings.ts";
 
-/** Ngữ cảnh cho AI: ngôn ngữ người dùng, loại tiền, đơn vị — để prompt đúng và kết quả khớp cài đặt. */
+/** Context for the AI: user language, currency, units — so the prompt is right and results match the settings. */
 export interface AiCtx { lang: Lang; languageName: string; locale: string; currency: string; digits: number; unit: string; taxRates: number[]; t: T }
-/** Thuế suất thường gặp để app tự suy ra thuế khi AI bỏ sót (chỉ khi chênh lệch khớp rất sát). */
+/** Common tax rates so the app can infer tax when the AI misses it (only when the difference matches very closely). */
 const TAX_RATES: Record<Lang, number[]> = { vi: [5, 8, 10], en: [5, 6, 7, 8, 10, 20] };
 export const aiContext = (i: I18n): AiCtx => ({
   lang: i.lang, languageName: LANGS[i.lang].label, locale: LANGS[i.lang].locale, currency: i.fmt.currency, digits: i.fmt.digits,
@@ -17,7 +17,7 @@ export const aiContext = (i: I18n): AiCtx => ({
 
 export interface DraftItem {
   raw_name: string; qty: number; amount: number; kind: "part" | "labor"; part_type_id: number | null;
-  /** nguồn phân loại: bộ nhớ đã xác nhận / AI / từ khóa tự động / chưa có */
+  /** classification source: confirmed memory / AI / automatic keyword / none */
   how?: "memory" | "ai" | "keyword" | null;
   confidence?: number | null;
 }
@@ -33,7 +33,7 @@ const KEYS: Record<Provider, string> = {
   claude: "ANTHROPIC_API_KEY", gemini: "GEMINI_API_KEY", deepseek: "DEEPSEEK_API_KEY",
 };
 
-/** Các nhà cung cấp có khóa, theo thứ tự thử: AI_PROVIDER (nếu đặt) trước, rồi các nhà còn lại. */
+/** Providers that have keys, in the order tried: AI_PROVIDER (if set) first, then the rest. */
 export function providerOrder(): Provider[] {
   const have = (Object.keys(KEYS) as Provider[]).filter((p) => !!process.env[KEYS[p]]);
   const want = (process.env.AI_PROVIDER || "").toLowerCase() as Provider;
@@ -98,7 +98,7 @@ const JSON_SCHEMA = {
   required: ["garage", "date", "odo", "discount", "vat", "vat_rate", "vat_included", "slip_total", "items"],
 } as const;
 
-/** Ảnh/PDF chỉ được gửi cho AI đọc rồi bỏ — không lưu ở đâu cả. */
+/** The image/PDF is only sent to the AI to read and then discarded — not stored anywhere. */
 export const supportedMime = (m: string) => /^(image\/(jpeg|png|webp|gif)|application\/pdf)$/.test(m);
 
 type Block = Record<string, unknown>;
@@ -113,7 +113,7 @@ export const CLAUDE_MODEL = () => process.env.CLAUDE_MODEL || "claude-sonnet-5-5
 
 export interface ClaudeResponse { content: Block[]; stop_reason: string }
 
-/** Gọi Claude Messages API trực tiếp bằng fetch (không cần SDK → gói Worker nhỏ hơn). */
+/** Call the Claude Messages API directly with fetch (no SDK needed → smaller Worker bundle). */
 export async function claudeCall(body: Record<string, unknown>): Promise<ClaudeResponse> {
   const res = await fetch(process.env.ANTHROPIC_API_BASE || "https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -127,7 +127,7 @@ export async function claudeCall(body: Record<string, unknown>): Promise<ClaudeR
 export const claudeText = (r: ClaudeResponse) =>
   r.content.filter((b) => b.type === "text").map((b) => String(b.text ?? "")).join("");
 
-/** Claude: các model 5.x không cho ép tool_choice → để auto + dặn gọi công cụ; nếu model trả văn bản JSON thì vẫn đọc được. */
+/** Claude: 5.x models don't allow forcing tool_choice → use auto + instruct it to call the tool; if the model returns JSON text it can still be parsed. */
 async function viaClaude(file: Buffer, mime: string, prompt: string): Promise<unknown> {
   const res = await claudeCall({
     max_tokens: 16000,
@@ -143,7 +143,7 @@ async function viaClaude(file: Buffer, mime: string, prompt: string): Promise<un
   return parseJson(text);
 }
 
-/** Google đổi/ngừng model khá thường xuyên → thử lần lượt, model nào 404 thì sang model kế. */
+/** Google changes/retires models fairly often → try them in turn, moving to the next model on a 404. */
 export const GEMINI_MODELS = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-2.5-flash"];
 const geminiBase = () => process.env.GEMINI_API_BASE || "https://generativelanguage.googleapis.com";
 
@@ -202,7 +202,7 @@ async function viaDeepseek(file: Buffer, mime: string, prompt: string, shape = S
   return parseJson(text);
 }
 
-/** Một số model bọc JSON trong ```json ... ``` — bóc ra trước khi parse. */
+/** Some models wrap JSON in ```json ... ``` — strip it before parsing. */
 export function parseJson(text: string): unknown {
   const t = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
   try {
@@ -219,7 +219,7 @@ const toInt = (v: unknown): number | null => {
   const n = Number(String(v).replace(/[.,\s]/g, ""));
   return Number.isFinite(n) ? Math.round(n) : null;
 };
-/** Số tiền AI trả về (đơn vị chính, có thể có phần thập phân) → đơn vị nhỏ nhất của loại tiền. */
+/** Amount returned by the AI (major unit, may have a decimal part) → smallest unit of the currency. */
 const toMinor = (v: unknown, digits: number): number | null => {
   if (v == null || v === "") return null;
   if (typeof v === "number") return Number.isFinite(v) ? Math.round(v * 10 ** digits) : null;
@@ -231,7 +231,7 @@ const toRate = (v: unknown): number | null => {
   return Number.isFinite(n) && n > 0 && n <= 30 ? n : null;
 };
 
-/** Ép dữ liệu thô từ AI về đúng kiểu, bỏ dòng rỗng; model nào cũng qua bước này. */
+/** Coerce raw AI data to the right types and drop empty rows; every model goes through this step. */
 export function normalizeDraft(raw: unknown, validParts: Set<number>, digits = 0): Draft {
   const r = (raw ?? {}) as Record<string, unknown>;
   const date = typeof r.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? r.date : null;
@@ -259,7 +259,7 @@ export function normalizeDraft(raw: unknown, validParts: Set<number>, digits = 0
   };
 }
 
-/** Lớp xử lý sau AI: bộ nhớ đã xác nhận → (giữ kết quả AI) → từ khóa tự động; rồi suy ra VAT nếu AI bỏ sót. */
+/** Post-AI processing: confirmed memory → (keep the AI result) → automatic keywords; then infer VAT if the AI missed it. */
 export async function refineDraft(d: Draft, parts: { id: number; key: string | null; name: string }[], taxRates?: number[]): Promise<Draft> {
   const kwParts = parts.map((p) => ({ id: p.id, kw: keywordsFor(p.name) }));
   const generic = parts.find((p) => p.key === GENERIC_KEY)?.id;
@@ -267,7 +267,7 @@ export async function refineDraft(d: Draft, parts: { id: number; key: string | n
     const alias = await get<{ part_type_id: number }>("SELECT part_type_id FROM part_aliases WHERE alias = ?", normName(it.raw_name));
     if (alias) { it.part_type_id = alias.part_type_id; it.how = "memory"; it.confidence = 1; continue; }
     const guess = guessPart(it.raw_name, kwParts);
-    // AI trả "Khác"/không chắc mà từ khóa nhận ra rõ hơn → dùng từ khóa
+    // AI returned "Other"/unsure but a keyword recognizes it more clearly → use the keyword
     if (guess && (it.part_type_id == null || it.part_type_id === generic || (it.confidence ?? 1) < 0.5) && guess !== it.part_type_id) {
       it.part_type_id = guess; it.how = "keyword";
     } else if (it.part_type_id == null && guess) { it.part_type_id = guess; it.how = "keyword"; }
@@ -279,7 +279,7 @@ export async function refineDraft(d: Draft, parts: { id: number; key: string | n
   return d;
 }
 
-/** Đọc ảnh/PDF rồi trả JSON theo `shape` — dùng cho các tác vụ ngoài phiếu (VD: bảng chu kỳ trong sổ hướng dẫn). */
+/** Read an image/PDF and return JSON per `shape` — used for tasks beyond records (e.g. the interval table in an owner's manual). */
 export async function visionJson(provider: Provider, file: Buffer, mime: string, prompt: string, shape: string): Promise<unknown> {
   if (provider === "gemini") return viaGemini(file, mime, prompt, shape);
   if (provider === "deepseek") return viaDeepseek(file, mime, prompt, shape);

@@ -7,7 +7,7 @@ import { Flash } from "../components/ui";
 export default async function Records({ searchParams }: { searchParams: Promise<{ ok?: string }> }) {
   const { ok } = await searchParams;
   const { t, fmt } = await getI18n();
-  // phiếu tạo ở bước "nhập lần thay ban đầu" không hiện trong lịch sử
+  // records created in the "enter initial replacement" step don't show in the history
   const recs = (await recordsFor()).filter((r) => r.total > 0 || r.note !== INITIAL_NOTE);
   return (
     <>

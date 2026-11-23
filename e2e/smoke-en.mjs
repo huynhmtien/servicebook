@@ -1,5 +1,5 @@
-// E2E bản tiếng Anh/quốc tế: mặc định theo trình duyệt (en-US → USD, dặm), tiền có xu, thuế, CSV, sao lưu/khôi phục,
-// đổi ngôn ngữ, và không lọt chữ tiếng Việt vào giao diện tiếng Anh. Chạy: node e2e/smoke-en.mjs (app + DB trống đang chạy ở BASE).
+// English/international E2E: browser-based defaults (en-US → USD, miles), money with cents, tax, CSV, backup/restore,
+// language switching, and no Vietnamese text leaking into the English UI. Run: node e2e/smoke-en.mjs (app + empty DB running at BASE).
 import { createRequire } from "node:module";
 const require = createRequire(process.env.PW_MODULE || "/node-tools/node_modules/");
 const { chromium } = require("playwright");
@@ -22,7 +22,7 @@ if (process.env.APP_PASSWORD) {
   await page.waitForURL((u) => !u.pathname.startsWith("/login"));
 }
 
-// 1. Lần đầu: mặc định theo trình duyệt en-US
+// 1. First run: defaults from the en-US browser
 await go("/");
 let body = await txt();
 check("Home is English with the quick-start checklist", body.includes("Quick start") && body.includes("Check language, currency and units"), body);
@@ -30,7 +30,7 @@ await go("/settings");
 check("First-run defaults from en-US: USD", (await page.inputValue("#currency")) === "USD");
 check("First-run defaults from en-US: miles", (await page.inputValue("#distance")) === "mi");
 
-// 2. Thêm xe diesel (đơn vị dặm)
+// 2. Add a diesel vehicle (miles)
 await go("/vehicles");
 check("Vehicle form uses miles", (await txt("form.card")).includes("Current odometer (mi)"));
 await page.fill("#name", "Work truck"); await page.fill("#model", "Ford F-250"); await page.fill("#odo", "48,500");
@@ -46,7 +46,7 @@ check("Diesel: fuel filter tracked", await rule("Fuel filter").locator("input[ty
 check("Default interval converted to miles (5,000 km → 3,000 mi)", (await rule("Engine oil").innerText()).replace(/\s+/g, " ").includes("3,000 mi"), await rule("Engine oil").innerText());
 check("Default interval source label in English", (await txt("body")).includes("Generic default · unverified"));
 
-// 2b. Trả lời qua Telegram để cập nhật ODO (webhook)
+// 2b. Reply via Telegram to update ODO (webhook)
 const MOCK = process.env.MOCK || "http://localhost:5599";
 await go("/settings");
 await page.click("button:has-text('Enable Telegram replies')");
@@ -67,7 +67,7 @@ await post(hook.secret_token, "hello there");
 const sent2 = (await (await fetch(MOCK + "/__bodies")).json()).filter((x) => x.url.includes("/sendMessage")).map((x) => JSON.parse(x.body).text);
 check("Unknown text gets the help message", sent2.at(-1).includes("Send the current odometer reading"), sent2.at(-1));
 
-// 3. Phiếu nhập tay có xu + thuế
+// 3. Manual record with cents + tax
 await go("/records/new?manual=1");
 await page.fill("#garage", "Main St Auto"); await page.fill("#date", "2026-03-04"); await page.fill("#odo", "49000");
 await page.fill("#name_0", "Oil change"); await page.fill("#amount_0", "89.99");
@@ -81,14 +81,14 @@ check("Part auto-assigned from English name (Engine oil)", body.includes("Engine
 const rid = page.url().match(/records\/(\d+)/)[1];
 check("An older slip (49,000) does not pull the current odometer (50,200) backwards", (await odo()).includes("50,200 mi"), await odo());
 
-// 4. Không lọt tiếng Việt vào giao diện tiếng Anh
+// 4. No Vietnamese leaks into the English UI
 for (const u of ["/", "/vehicles", `/vehicles/${vid}`, `/vehicles/${vid}/setup`, "/records", `/records/${rid}`, "/records/new", "/records/new?manual=1", "/compare", `/compare?part=2`, "/settings"]) {
   await go(u);
   const t = (await txt()).replace("Tiếng Việt", "");
   check(`No Vietnamese text on ${u}`, !VI.test(t), t.match(new RegExp(`.{0,30}${VI.source}.{0,30}`, "i"))?.[0]);
 }
 
-// 5. Xuất CSV + sao lưu
+// 5. CSV export + backup
 const cookie = (await ctx.cookies()).map((c) => `${c.name}=${c.value}`).join("; ");
 const csv = await (await fetch(BASE + "/api/export", { headers: { cookie } })).text();
 check("CSV export: header + amount in major units + currency code", csv.includes("amount_USD") && csv.includes("89.99") && csv.includes("Oil change"), csv);
@@ -97,7 +97,7 @@ const backup = await bkRes.json();
 check("Backup JSON has the vehicle, slip and catalog", backup.app === "servicebook" && backup.data.vehicles.length === 1 && backup.data.service_records.length === 1 && backup.data.part_types.length === 32);
 check("Backup filename is servicebook-backup-*.json", (bkRes.headers.get("content-disposition") || "").includes("servicebook-backup-"));
 
-// 6. Khôi phục: xóa xe rồi khôi phục từ file
+// 6. Restore: delete the vehicle then restore from the file
 await go(`/vehicles/${vid}`);
 await page.click("button:has-text('Delete this vehicle')"); await page.waitForURL(/\/vehicles\?ok=/);
 check("Vehicle deleted (history empty)", (await (async () => { await go("/records"); return txt(); })()).includes("No slips yet"));
@@ -114,7 +114,7 @@ check("Invalid backup file rejected with a clear message", (await txt(".flash"))
 await go("/records");
 check("Data untouched after a rejected restore", (await txt()).includes("Main St Auto"));
 
-// 7. Đổi ngôn ngữ sang tiếng Việt và quay lại
+// 7. Switch the language to Vietnamese and back
 await go("/settings");
 await page.selectOption("#lang", "vi"); await page.click("button:has-text('Save settings')");
 await page.waitForURL(/\/settings\?ok=/);
@@ -128,7 +128,7 @@ check("Back to English", (await txt(".flash")).includes("Settings saved") && (aw
 await go("/");
 check("Quick-start 'check settings' step is done after saving", !(await txt()).includes("Check language, currency and units") || (await page.locator(".step.done").count()) > 0);
 
-// Lỗi hydrate React #418 chập chờn (~1–4% lượt tải nhanh, cả ở bản đã deploy trước đó; React tự phục hồi) → chỉ báo, không làm hỏng bài.
+// Intermittent React #418 hydration error (~1–4% of fast loads, also in the previously deployed build; React recovers on its own) → only reported, doesn't fail the test.
 const hydration = jsErrors.filter((e) => /#418/.test(e)), real = jsErrors.filter((e) => !/#418/.test(e));
 if (hydration.length) console.log(`NOTE  ${hydration.length} intermittent React hydration warning(s) (#418), known upstream flake`);
 check("No JavaScript errors during the session (besides the known intermittent hydration flake)", real.length === 0, real.join(" | "));

@@ -17,9 +17,9 @@ export interface RuleResult {
   dueDate: string | null;
   kmLeft: number | null;
   daysLeft: number | null;
-  /** Ngày dự kiến tới hạn sớm nhất (theo thời gian hoặc theo km ước tính) */
+  /** Earliest expected due date (by time or by estimated km) */
   predictedDate: string | null;
-  /** Mức độ gấp, càng nhỏ càng gấp; dùng để sắp xếp */
+  /** Urgency level, lower = more urgent; used for sorting */
   urgency: number;
   trigger: "km" | "time" | null;
 }
@@ -49,7 +49,7 @@ export function evaluateRule(i: RuleInput): RuleResult {
   }
   if (kmLeft == null && daysLeft == null) return empty;
 
-  // quy km còn lại về số ngày để so sánh và sắp xếp chung một thước đo
+  // convert remaining km to days so comparison and sorting use a single measure
   const kmDays = kmLeft != null && i.avgKmPerDay > 0 ? kmLeft / i.avgKmPerDay : null;
   const candidates: { days: number; t: "km" | "time" }[] = [];
   if (kmDays != null) candidates.push({ days: kmDays, t: "km" });
@@ -77,7 +77,7 @@ export function evaluateRule(i: RuleInput): RuleResult {
 
 export interface OdoPoint { date: string; km: number }
 
-/** Km trung bình mỗi ngày từ lịch sử odo (tối đa ~1 năm gần nhất). */
+/** Average km per day from the odo history (at most the last ~1 year). */
 export function avgKmPerDay(points: OdoPoint[], today: string, fallback = 40): number {
   const pts = points
     .filter((p) => daysBetween(p.date, today) <= 400)

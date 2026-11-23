@@ -1,11 +1,11 @@
 export interface Money {
-  sum: number;            // cộng các hạng mục (như in trên phiếu)
-  discount: number;       // giảm giá / chiết khấu (số dương)
-  vat: number;            // tiền thuế GTGT
-  vatIncluded: boolean;   // true: giá các dòng ĐÃ gồm VAT (VAT chỉ để tham khảo); false: VAT cộng thêm bên ngoài
+  sum: number;            // sum of the items (as printed on the record)
+  discount: number;       // discount / rebate (positive number)
+  vat: number;            // VAT amount
+  vatIncluded: boolean;   // true: line prices ALREADY include VAT (VAT is for reference only); false: VAT is added on top
 }
 
-/** Tổng phải thanh toán theo các thành phần. */
+/** Total payable from the components. */
 export const expectedTotal = (m: Money): number => m.sum - m.discount + (m.vatIncluded ? 0 : m.vat);
 
 export function reconcile(m: Money, slipTotal: number | null): { expected: number; diff: number | null; ok: boolean | null } {
@@ -17,7 +17,7 @@ export function reconcile(m: Money, slipTotal: number | null): { expected: numbe
 
 const DEFAULT_RATES = [5, 8, 10];
 
-/** AI hay bỏ sót thuế: nếu tổng trên phiếu hơn (cộng hàng − giảm giá) đúng một thuế suất thường gặp thì suy ra thuế. */
+/** The AI often misses tax: if the record's total exceeds (sum of lines − discount) by exactly a common tax rate, infer the tax. */
 export function inferVat(sum: number, discount: number, vat: number, slipTotal: number | null, rates: number[] = DEFAULT_RATES): { vat: number; rate: number | null; inferred: boolean } {
   if (vat > 0 || slipTotal == null) return { vat, rate: null, inferred: false };
   const base = sum - discount;
@@ -28,7 +28,7 @@ export function inferVat(sum: number, discount: number, vat: number, slipTotal: 
   return rate ? { vat: diff, rate, inferred: true } : { vat: 0, rate: null, inferred: false };
 }
 
-/** Hệ số quy giá dòng về giá trước thuế (để so sánh giữa các garage cho công bằng). */
+/** Factor to convert a line price to pre-tax price (so garages can be compared fairly). */
 export const netFactor = (rate: number | null, included: boolean): number => (included && rate && rate > 0 ? 1 / (1 + rate / 100) : 1);
 
 export const vatFromRate = (base: number, rate: number): number => Math.round((base * rate) / 100);

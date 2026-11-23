@@ -19,7 +19,7 @@ const shape = (c: AiCtx) => `{
                "confidence": "high"|"medium"|"low" } ]
 }`;
 
-/** AI có khả năng tìm web: Claude (web_search) hoặc Gemini (Google Search grounding). DeepSeek thì không. */
+/** AI with web search capability: Claude (web_search) or Gemini (Google Search grounding). DeepSeek has none. */
 export const researchProviders = (): Provider[] => providerOrder().filter((p) => p === "claude" || p === "gemini");
 
 export async function trackedParts() {
@@ -31,7 +31,7 @@ const intOrNull = (v: unknown, max: number): number | null => {
   return Number.isFinite(n) && n > 0 && n <= max ? Math.round(n) : null;
 };
 
-/** Ép kết quả AI về kiểu chuẩn; bỏ dòng lạ hoặc không có số nào. */
+/** Coerce AI results to the standard type; drop odd rows or rows with no numbers. */
 export function normalizeProposal(raw: unknown, valid: Set<number>, meta: { vehicle_id: number; origin: "ai" | "doc"; provider: string; sources: { title: string; url: string }[] }): IntervalProposal {
   const r = (raw ?? {}) as Record<string, unknown>;
   const seen = new Set<number>();
@@ -77,7 +77,7 @@ async function searchClaude(prompt: string): Promise<{ text: string; sources: { 
         for (const r of b.content as Record<string, string>[]) if (r.type === "web_search_result" && r.url) sources.set(r.url, r.title || r.url);
     }
     text = claudeText(res);
-    if (res.stop_reason !== "pause_turn") break; // pause_turn: tìm web chưa xong, gửi lại để tiếp tục
+    if (res.stop_reason !== "pause_turn") break; // pause_turn: web search not finished, resend to continue
     messages.push({ role: "assistant", content: res.content });
   }
   if (!text) throw new Error("Claude không trả về kết quả tra cứu");
@@ -92,7 +92,7 @@ async function searchGemini(prompt: string, shape: string): Promise<{ text: stri
   });
 }
 
-/** Tra cứu chu kỳ chuẩn theo dòng xe. Kết quả chỉ là ĐỀ XUẤT — người dùng phải xác nhận. */
+/** Look up standard intervals for the vehicle model. The result is only a SUGGESTION — the user must confirm. */
 export async function researchIntervals(vehicle: { id: number; name: string; model: string | null; year: number | null }, ctx: AiCtx): Promise<IntervalProposal> {
   const providers = researchProviders();
   if (!providers.length) throw new Error(ctx.t("ai.research_needs_key"));
@@ -113,7 +113,7 @@ export async function researchIntervals(vehicle: { id: number; name: string; mod
   throw new Error(errors.join(" | "));
 }
 
-/** Đọc bảng bảo dưỡng chụp từ sổ hướng dẫn / sổ bảo hành của xe. */
+/** Read the maintenance table photographed from the vehicle's owner's manual / warranty book. */
 export async function extractIntervalsFromDoc(vehicle: { id: number }, file: Buffer, mime: string, ctx: AiCtx): Promise<IntervalProposal> {
   const order = providerOrder();
   if (!order.length) throw new Error(ctx.t("ai.no_key"));

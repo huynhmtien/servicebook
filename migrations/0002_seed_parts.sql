@@ -1,4 +1,4 @@
--- Danh mục linh kiện chuẩn (sinh từ src/lib/parts.ts bằng scripts/gen-seed.ts)
+-- Standard parts catalog (generated from src/lib/parts.ts by scripts/gen-seed.ts)
 INSERT OR IGNORE INTO part_types (name, category, default_km, default_months) VALUES
   ('Bảo dưỡng định kỳ theo hãng', 'Định kỳ', 10000, 6),
   ('Dầu động cơ', 'Động cơ', 5000, 6),
@@ -33,6 +33,6 @@ INSERT OR IGNORE INTO part_types (name, category, default_km, default_months) VA
   ('Phụ phí / vật tư phụ khác', 'Chi phí khác', NULL, NULL),
   ('Khác (chưa phân loại)', 'Chi phí khác', NULL, NULL);
 
--- xe đã có từ trước (nếu có): bổ sung rule cho linh kiện chưa có
+-- pre-existing vehicles (if any): add rules for parts they don't have yet
 INSERT OR IGNORE INTO rules (vehicle_id, part_type_id, interval_km, interval_months)
   SELECT v.id, p.id, p.default_km, p.default_months FROM vehicles v CROSS JOIN part_types p WHERE p.category <> 'Chi phí khác';

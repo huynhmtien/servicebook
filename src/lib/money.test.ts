@@ -40,6 +40,6 @@ test("giá trước thuế để so sánh giữa garage", () => {
 test("inferVat: thuế suất theo danh sách tùy chọn (en: 7%, 20%)", async () => {
   const { inferVat } = await import("./money.ts");
   assert.deepEqual(inferVat(10000, 0, 0, 10700, [5, 7, 10]), { vat: 700, rate: 7, inferred: true });
-  assert.equal(inferVat(10000, 0, 0, 10700).inferred, false); // mặc định (5/8/10) không có 7%
+  assert.equal(inferVat(10000, 0, 0, 10700).inferred, false); // defaults (5/8/10) don't include 7%
   assert.deepEqual(inferVat(10000, 0, 0, 12000, [5, 7, 20]), { vat: 2000, rate: 20, inferred: true });
 });

@@ -1,7 +1,7 @@
-// Deploy an toàn. Dùng: `npm run release` (build + migrate + deploy) hoặc `npm run db:migrate` (chỉ migrate).
-// - Chỉ deploy Worker tên "servicebook" (tránh ghi nhầm sang project khác trong cùng tài khoản).
-// - database_id thật KHÔNG nằm trong repo: đặt biến môi trường SERVICEBOOK_D1_ID (mã in ra bởi `wrangler d1 create servicebook`),
-//   hoặc sửa tại chỗ wrangler.jsonc trên máy bạn (đừng commit).
+// Safe deploy. Usage: `npm run release` (build + migrate + deploy) or `npm run db:migrate` (migrate only).
+// - Only deploys the Worker named "servicebook" (avoids overwriting another project in the same account).
+// - The real database_id is NOT in the repo: set the SERVICEBOOK_D1_ID environment variable (the id printed by `wrangler d1 create servicebook`),
+//   or edit wrangler.jsonc in place on your machine (don't commit).
 import { readFileSync, writeFileSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
@@ -23,7 +23,7 @@ const sh = (args) => { const r = spawnSync("npx", args, { stdio: "inherit" }); i
 const cleanup = () => { if (id) rmSync(config, { force: true }); };
 
 const migrate = () => sh(["wrangler", "d1", "migrations", "apply", "servicebook", "--remote", "--config", config]);
-const extra = process.argv.slice(2); // vd: --secrets-file secrets.env (chuyển tiếp cho wrangler deploy)
+const extra = process.argv.slice(2); // e.g. --secrets-file secrets.env (forwarded to wrangler deploy)
 if (extra[0] === "migrate") migrate();
 else {
   sh(["opennextjs-cloudflare", "build"]);

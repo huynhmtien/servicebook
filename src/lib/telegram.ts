@@ -1,7 +1,7 @@
 import { getI18n } from "./settings.ts";
 import type { T } from "./i18n/index.ts";
 
-/** Giá trị dán vào biến môi trường hay dính khoảng trắng / xuống dòng / dấu ngoặc kép → làm sạch. */
+/** Values pasted into environment variables often carry spaces / newlines / quotes → clean them. */
 const clean = (v?: string) => (v ?? "").trim().replace(/^["']|["']$/g, "").trim();
 const token = () => clean(process.env.TELEGRAM_BOT_TOKEN);
 const chat = () => clean(process.env.TELEGRAM_CHAT_ID);
@@ -26,7 +26,7 @@ async function call(method: string, body?: unknown): Promise<TgResult> {
   }
 }
 
-/** Dịch lỗi Telegram sang lời khuyên cụ thể (theo ngôn ngữ đang dùng). */
+/** Translate Telegram errors into specific advice (in the current language). */
 export function hint(t: T, status: number, description = "", stage: "token" | "send"): string {
   const d = description.toLowerCase();
   if (status === 0) return t("tg.hint_network", { detail: description });
@@ -38,7 +38,7 @@ export function hint(t: T, status: number, description = "", stage: "token" | "s
   return t("tg.hint_generic", { status, detail: description || t("tg.unknown") });
 }
 
-/** Đăng ký webhook để bot nhận tin trả lời (cập nhật ODO bằng tin nhắn). */
+/** Register the webhook so the bot receives replies (update ODO via message). */
 export async function setTelegramWebhook(url: string, secret: string): Promise<{ ok: boolean; error?: string }> {
   const { t } = await getI18n();
   const r = await call("setWebhook", { url, secret_token: secret, allowed_updates: ["message"], drop_pending_updates: true });
@@ -54,7 +54,7 @@ export async function sendTelegram(text: string): Promise<{ ok: boolean; error?:
 
 export interface Step { ok: boolean; text: string }
 
-/** Kiểm tra từng bước để biết chính xác hỏng ở đâu. */
+/** Check step by step to know exactly where it breaks. */
 export async function telegramDiagnose(): Promise<{ ok: boolean; steps: Step[] }> {
   const { t } = await getI18n();
   const steps: Step[] = [];

@@ -1,6 +1,6 @@
-/** Múi giờ chạy: lấy từ cài đặt (settings.ts gọi setTz mỗi request); app một chủ nên giá trị toàn cục là an toàn. */
+/** Runtime time zone: taken from settings (settings.ts calls setTz on every request); the app has a single owner so a global value is safe. */
 let TZ = process.env.APP_TZ || "UTC";
-/** Dấu hiệu cố định (không phụ thuộc ngôn ngữ) cho phiếu tạo ra ở bước "nhập lần thay ban đầu". */
+/** Fixed marker (language-independent) for records created in the "enter initial replacement" step. */
 export const INITIAL_NOTE = "__initial__";
 export const setTz = (z: string) => { TZ = z; };
 export const getTz = () => TZ;
