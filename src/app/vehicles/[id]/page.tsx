@@ -55,7 +55,7 @@ export default async function VehiclePage({ params, searchParams }: { params: Pr
 
       <details className="card">
         <summary>{t("veh.edit")}</summary>
-        <form action={updateVehicle} className="form" style={{ marginTop: 12 }}>
+        <form action={updateVehicle} className="form cols" style={{ marginTop: 12 }}>
           <input type="hidden" name="id" value={id} />
           <div className="field"><label htmlFor="e_name">{t("veh.edit_name")}</label><input id="e_name" name="name" defaultValue={v.name} required /></div>
           <div className="field"><label htmlFor="e_plate">{t("veh.plate")}</label><input id="e_plate" name="plate" defaultValue={v.plate ?? ""} /></div>

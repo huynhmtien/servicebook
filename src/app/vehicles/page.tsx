@@ -23,7 +23,7 @@ export default async function Vehicles({ searchParams }: { searchParams: Promise
         </div>
       )}
       <h2>{t("veh.add_title")}</h2>
-      <form action={addVehicle} className="card form">
+      <form action={addVehicle} className="card form cols">
         <div className="field"><label htmlFor="name">{t("veh.name")}</label><input id="name" name="name" required placeholder={t("veh.name_ph")} /></div>
         <div className="field"><label htmlFor="plate">{t("veh.plate")}</label><input id="plate" name="plate" /></div>
         <div className="field"><label htmlFor="model">{t("veh.model")}</label><input id="model" name="model" placeholder={t("veh.model_ph")} /></div>

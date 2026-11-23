@@ -281,7 +281,7 @@ const vi: Messages = {
   "cmp.each_time": "Từng lần",
 
   "set.title": "Cài đặt",
-  "set.sub": "Tùy chọn được lưu trong app. Bí mật (khóa, mật khẩu) đặt dưới dạng secret của Worker.",
+  "set.sub": "Tùy chọn, khóa API và mật khẩu của bạn. Khóa được lưu mã hóa và không bao giờ hiển thị lại.",
   "set.general": "Chung",
   "set.language": "Ngôn ngữ",
   "set.lang_auto": "Tự động (theo trình duyệt)",

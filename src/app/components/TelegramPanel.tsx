@@ -34,12 +34,12 @@ export default function TelegramPanel() {
   const [w, webhookAction] = useActionState<TgState, FormData>(enableTelegramReplies, {});
   return (
     <>
-      <div className="row">
+      <div className="actions">
         <form action={testAction}><Btn>{t("tg.test")}</Btn></form>
         <form action={digestAction}><Btn>{t("tg.digest")}</Btn></form>
         <form action={webhookAction}><Btn>{t("tg.webhook_enable")}</Btn></form>
       </div>
-      <p className="mute" style={{ margin: "8px 0 0" }}>{t("tg.webhook_hint")}</p>
+      <p className="mute" style={{ margin: "12px 0 0" }}>{t("tg.webhook_hint")}</p>
       <Result s={tr} />
       <Result s={d} />
       <Result s={w} />

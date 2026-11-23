@@ -26,7 +26,7 @@ await page.click("button.primary"); await page.waitForURL(/\/vehicles\/\d+\/setu
 await go("/records/new");
 check("Without a key, scanning is unavailable (message shown)", (await txt()).includes("No AI key"));
 await go("/settings");
-check("Settings shows AI and Telegram as not enabled", (await page.locator(".li .badge.b-soon").count()) >= 2);
+check("Settings shows every key as not set", (await page.locator("#keys + form .badge.b-unknown").count()) === 5);
 
 // 2. Giá trị sai bị từ chối và KHÔNG lưu gì (kể cả ô đúng)
 await page.fill('input[name="GEMINI_API_KEY"]', GEMINI);
@@ -45,7 +45,7 @@ let card = await txt("#keys + form");
 check("Saved: keys shown only as masked tails", card.includes("Saved ••••2345") && card.includes("Saved ••••e_12") && card.includes("Saved ••••4242") && !card.includes(GEMINI) && !card.includes(TOKEN), card);
 const html = await page.content();
 check("The raw keys are never present in the page HTML", !html.includes(GEMINI) && !html.includes(TOKEN));
-check("AI and Telegram rows are now enabled", (await page.locator(".li .badge.b-ok").count()) >= 2);
+check("The three saved keys show as set", (await page.locator("#keys + form .badge.b-ok").count()) === 3);
 
 // 4. Có tác dụng: quét phiếu và Telegram dùng khóa vừa nhập
 await go("/records/new");

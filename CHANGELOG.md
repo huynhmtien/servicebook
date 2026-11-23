@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.4.1 — 2026-11-23
+- **Layout fix on wide screens**: forms were laid out in an auto-fit grid that put labels, intro text and group headings into separate columns (misaligned fields, clipped select text). Forms are now one tidy column by default, with opt-in two-column rows for short paired fields. Settings page rebuilt: duplicate status rows removed (each key shows its own status), grouped sections, evenly sized action buttons. Receipt detail no longer leaves half the page empty.
+
 ## 1.4.0 — 2026-11-23
 - **Change password in the app** (Settings → Password): current + new password, optional *Sign out all other devices* (session epoch, effective within seconds). Stored as a salted PBKDF2 hash peppered with `SESSION_SECRET`; `APP_PASSWORD` becomes a fallback. Rate-limited like sign-in. Recovery steps in SETUP.md.
 - **"Deploy to Cloudflare" button**: one click creates the database and asks for two values (`APP_PASSWORD`, `SESSION_SECRET`). `package.json` now has `build` / `deploy` / `db:migrations:apply` scripts (migrations by binding name); `database_id` removed from `wrangler.jsonc` (auto-provisioned); `.dev.vars.example` lists only the two required secrets.

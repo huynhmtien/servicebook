@@ -109,7 +109,7 @@ export default function RecordItems({ parts, initial, blank, money: m0 = {} }: {
         <div className="row" style={{ justifyContent: "space-between" }}><span>{t("pay.items_sum")}</span><b>{money(sum)}</b></div>
         <div className="mute" style={{ textAlign: "right" }}>{t("pay.parts_labor", { parts: money(partSum), labor: money(laborSum) })}</div>
 
-        <div className="form" style={{ marginTop: 14 }}>
+        <div className="form cols" style={{ marginTop: 14 }}>
           <div className="field"><label htmlFor="discount">{t("pay.discount", { currency: fmt.currency })}</label>
             <input id="discount" name="discount" inputMode="decimal" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0" /></div>
           <div className="field"><label htmlFor="vat_mode">{t("pay.tax_mode", { label: fmt.taxLabel })}</label>

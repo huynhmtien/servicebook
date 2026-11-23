@@ -293,7 +293,7 @@ const en = {
 
   // settings
   "set.title": "Settings",
-  "set.sub": "Preferences are stored in the app. Secrets (keys, passwords) are set as Worker secrets.",
+  "set.sub": "Your preferences, API keys and password. Keys are stored encrypted and never shown again.",
   "set.general": "General",
   "set.language": "Language",
   "set.lang_auto": "Automatic (browser)",

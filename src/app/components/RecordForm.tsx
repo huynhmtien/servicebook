@@ -21,7 +21,7 @@ export default async function RecordForm({ d, blank = 3 }: { d: RecordDefaults; 
   return (
     <form action={saveRecord}>
       {d.draft_id && <input type="hidden" name="draft_id" value={d.draft_id} />}
-      <div className="card form">
+      <div className="card form cols">
         <div className="field"><label htmlFor="vehicle_id">{t("form.vehicle")}</label>
           <select id="vehicle_id" name="vehicle_id" defaultValue={d.vehicle_id} required>
             {vehicles.map((v) => <option key={v.id} value={v.id}>{v.name}{v.plate ? ` — ${v.plate}` : ""}</option>)}
