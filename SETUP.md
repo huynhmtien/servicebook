@@ -44,7 +44,26 @@ npm run release -- --secrets-file secrets.env
 
 This builds, applies the database migrations, and deploys the Worker named `servicebook`. Later deployments only need `npm run release` (existing secrets are kept).
 
-Your app is at `https://servicebook.<your-subdomain>.workers.dev`. For a custom domain: Cloudflare dashboard → Workers → servicebook → Settings → Domains & Routes.
+Your app is at `https://servicebook.<your-subdomain>.workers.dev`. To use your own domain, see [Use your own domain](#use-your-own-domain).
+
+## Use your own domain
+
+A Worker can only be attached to a domain whose DNS is hosted **in your Cloudflare account** (free plan is fine). A subdomain such as `cars.example.com` cannot be attached if `example.com`'s DNS lives at another provider. Two ways to get a suitable domain:
+
+- **Register a new domain with Cloudflare Registrar** (sold at cost; DNS is already on Cloudflare), or
+- **Add an existing domain to Cloudflare** (Cloudflare dashboard → Add a domain, then change the nameservers at your registrar). Before switching, make sure Cloudflare imported *every* existing record (website, mail/MX, other subdomains) — changing nameservers moves all of them.
+
+Then, on your machine:
+
+```bash
+export SERVICEBOOK_DOMAIN=cars.example.com      # host name only, no https://
+npm run release
+```
+
+Cloudflare creates the DNS record and the HTTPS certificate automatically (a few minutes). Afterwards:
+1. Sign in at the new address (cookies are per-domain, so you sign in again).
+2. If you use Telegram replies: Settings → *Enable Telegram replies* again (the webhook address changed).
+3. Optional: `export SERVICEBOOK_DISABLE_WORKERS_DEV=1` and release once more to switch the `*.workers.dev` address off.
 
 ## 5. First steps in the app
 

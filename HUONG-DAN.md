@@ -44,7 +44,26 @@ npm run release -- --secrets-file secrets.env
 
 Lệnh này build, áp dụng migration database, rồi deploy Worker tên `servicebook`. Các lần sau chỉ cần `npm run release` (bí mật đã đặt vẫn được giữ).
 
-App ở `https://servicebook.<tên-miền-phụ-của-bạn>.workers.dev`. Muốn tên miền riêng: Cloudflare → Workers → servicebook → Settings → Domains & Routes.
+App ở `https://servicebook.<tên-miền-phụ-của-bạn>.workers.dev`. Muốn dùng tên miền riêng, xem mục [Dùng tên miền riêng](#dùng-tên-miền-riêng).
+
+## Dùng tên miền riêng
+
+Worker chỉ gắn được vào tên miền có DNS **nằm trong tài khoản Cloudflare của bạn** (gói miễn phí là đủ). Tên miền phụ như `cars.example.com` không gắn được nếu DNS của `example.com` đang ở nhà cung cấp khác. Hai cách có tên miền phù hợp:
+
+- **Đăng ký tên miền mới ở Cloudflare Registrar** (bán đúng giá gốc; DNS đã nằm sẵn ở Cloudflare), hoặc
+- **Thêm tên miền đang có vào Cloudflare** (dashboard → Add a domain, rồi đổi nameserver ở nơi bạn đăng ký). Trước khi đổi, hãy chắc Cloudflare đã nhập **đủ** mọi bản ghi hiện có (website, thư/MX, các tên miền phụ khác) — đổi nameserver là chuyển tất cả chúng.
+
+Sau đó, trên máy của bạn:
+
+```bash
+export SERVICEBOOK_DOMAIN=cars.example.com      # chỉ tên máy chủ, không có https://
+npm run release
+```
+
+Cloudflare tự tạo bản ghi DNS và chứng chỉ HTTPS (vài phút). Sau đó:
+1. Đăng nhập lại ở địa chỉ mới (cookie gắn theo từng tên miền).
+2. Nếu dùng trả lời qua Telegram: Cài đặt → *Bật trả lời qua Telegram* lần nữa (địa chỉ webhook đã đổi).
+3. Tùy chọn: `export SERVICEBOOK_DISABLE_WORKERS_DEV=1` rồi release thêm một lần để tắt địa chỉ `*.workers.dev`.
 
 ## 5. Những bước đầu trong app
 

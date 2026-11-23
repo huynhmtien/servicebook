@@ -6,6 +6,7 @@
   - Touch targets ≥ 44px for back links, interval rows, remove buttons and segmented controls; tab labels 11px; links inside running text are underlined.
   - Login: show/hide password toggle (paste and password managers stay enabled). Skip-to-content link; error notices are announced (`role="alert"`); completed checklist steps are readable by screen readers (no more strike-through).
   - Vehicle page: the repeated "generic default" badge on every part is gone (explained once; only AI / manual / user-set intervals are labeled). Consistent file-input styling. Wider column on desktop.
+- **Custom domain support** in `npm run release` via `SERVICEBOOK_DOMAIN` (and optional `SERVICEBOOK_DISABLE_WORKERS_DEV=1`); nothing account-specific is stored in the repo. English messages in the release script.
 - `npm run audit:ui` (e2e/ui-audit.mjs): screenshots + axe + touch-target and overflow checks for every screen.
 
 ## 1.2.0 — 2026-11-23

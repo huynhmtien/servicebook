@@ -27,6 +27,8 @@
 
 ## Cài đặt nhanh
 
+Muốn dùng tên miền riêng: xem [Dùng tên miền riêng](HUONG-DAN.md#dùng-tên-miền-riêng).
+
 Cần Node 22+ và tài khoản Cloudflare miễn phí. Chi tiết ở **[HUONG-DAN.md](HUONG-DAN.md)**:
 
 ```bash
