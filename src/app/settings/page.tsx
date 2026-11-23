@@ -1,36 +1,88 @@
 import { telegramConfigured } from "../../lib/telegram.ts";
 import { activeProvider, providerOrder } from "../../lib/extract.ts";
+import { getI18n } from "../../lib/settings.ts";
+import { LANGS, LANG_CODES } from "../../lib/i18n/index.ts";
 import Icon from "../components/Icon";
-import { logout } from "../actions";
+import { Flash } from "../components/ui";
+import { logout, restoreAction, saveSettingsAction } from "../actions";
+import ConfirmButton from "../components/ConfirmButton";
 import TelegramPanel from "../components/TelegramPanel";
 
-const Row = ({ ok, label, hint }: { ok: boolean; label: string; hint: string }) => (
-  <div className="li">
-    <span className={`badge ${ok ? "b-ok" : "b-soon"}`}><Icon n={ok ? "check" : "alert"} s={14} />{ok ? "Đã bật" : "Chưa bật"}</span>
-    <div className="grow"><div className="t">{label}</div>{!ok && <div className="mute">{hint}</div>}</div>
-  </div>
-);
+const CURRENCIES = ["USD", "EUR", "GBP", "VND", "JPY", "KRW", "CNY", "INR", "AUD", "CAD", "NZD", "SGD", "THB", "MYR", "IDR", "PHP", "CHF", "SEK", "NOK", "DKK", "PLN", "BRL", "MXN"];
 
-export default async function Settings() {
+export default async function Settings({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
+  const { ok, error } = await searchParams;
+  const { t, settings: s } = await getI18n();
   const tg = telegramConfigured();
   const ai = providerOrder();
+  let zones: string[] = [];
+  try { zones = (Intl as unknown as { supportedValuesOf: (k: string) => string[] }).supportedValuesOf("timeZone"); } catch { zones = []; }
+  const Row = ({ on, label, hint }: { on: boolean; label: string; hint: string }) => (
+    <div className="li">
+      <span className={`badge ${on ? "b-ok" : "b-soon"}`}><Icon n={on ? "check" : "alert"} s={14} />{on ? t("common.enabled") : t("common.disabled")}</span>
+      <div className="grow"><div className="t">{label}</div>{!on && <div className="mute">{hint}</div>}</div>
+    </div>
+  );
   return (
     <>
-      <h1>Cài đặt</h1>
-      <p className="sub">Các mục cấu hình được đặt ở biến môi trường (Cloudflare → Workers → servicebook → Settings → Variables and Secrets, hoặc `wrangler secret put`).</p>
-            <div className="list">
-        <Row ok={tg} label="Nhắc việc qua Telegram" hint="Đặt TELEGRAM_BOT_TOKEN và TELEGRAM_CHAT_ID (secret)" />
-        <Row ok={!!activeProvider()} label={`Đọc phiếu bằng AI${ai.length ? ` (${ai.join(" → ")})` : ""}`} hint="Đặt GEMINI_API_KEY, DEEPSEEK_API_KEY hoặc ANTHROPIC_API_KEY" />
-        <Row ok={!!process.env.APP_PASSWORD} label="Mật khẩu truy cập" hint="Đặt APP_PASSWORD và SESSION_SECRET (nên bật nếu app mở ra internet)" />
+      <h1>{t("set.title")}</h1>
+      <p className="sub">{t("set.sub")}</p>
+      <Flash text={error} />
+      <Flash text={ok} ok />
+
+      <h2>{t("set.general")}</h2>
+      <form action={saveSettingsAction} className="card form">
+        <div className="field"><label htmlFor="lang">{t("set.language")}</label>
+          <select id="lang" name="lang" defaultValue={s.langSetting}>
+            <option value="auto">{t("set.lang_auto")}</option>
+            {LANG_CODES.map((c) => <option key={c} value={c}>{LANGS[c].label}</option>)}
+          </select></div>
+        <div className="field"><label htmlFor="currency">{t("set.currency")}</label>
+          <input id="currency" name="currency" list="currencies" defaultValue={s.currency} maxLength={3} style={{ textTransform: "uppercase" }} />
+          <datalist id="currencies">{CURRENCIES.map((c) => <option key={c} value={c} />)}</datalist>
+          <div className="mute">{t("set.currency_hint")}</div></div>
+        <div className="field"><label htmlFor="distance">{t("set.distance")}</label>
+          <select id="distance" name="distance" defaultValue={s.distance}>
+            <option value="km">{t("set.dist_km")}</option><option value="mi">{t("set.dist_mi")}</option>
+          </select>
+          <div className="mute">{t("set.dist_hint")}</div></div>
+        <div className="field"><label htmlFor="tax_label">{t("set.tax_label")}</label>
+          <input id="tax_label" name="tax_label" defaultValue={s.taxLabel} maxLength={20} />
+          <div className="mute">{t("set.tax_hint")}</div></div>
+        <div className="field"><label htmlFor="timezone">{t("set.timezone")}</label>
+          <input id="timezone" name="timezone" list="zones" defaultValue={s.timezone} />
+          <datalist id="zones">{zones.map((z) => <option key={z} value={z} />)}</datalist></div>
+        <div className="field"><label htmlFor="reminder_hour">{t("set.reminder_hour")}</label>
+          <input id="reminder_hour" name="reminder_hour" inputMode="numeric" defaultValue={s.reminderHour} /></div>
+        <button className="btn primary" type="submit">{t("set.save")}</button>
+      </form>
+
+      <div className="list" style={{ marginTop: 16 }}>
+        <Row on={tg} label={t("set.row_telegram")} hint={t("set.row_telegram_hint")} />
+        <Row on={!!activeProvider()} label={`${t("set.row_ai")}${ai.length ? ` (${ai.join(" → ")})` : ""}`} hint={t("set.row_ai_hint")} />
+        <Row on={!!process.env.APP_PASSWORD} label={t("set.row_password")} hint={t("set.row_password_hint")} />
       </div>
       <TelegramPanel />
-      <div className="card" style={{ marginTop: 16 }}>
-        <b>Sao lưu dữ liệu</b>
-        <p className="mute" style={{ margin: "6px 0 12px" }}>Tải toàn bộ xe, phiếu, chu kỳ về máy (file JSON). Nên tải định kỳ, ví dụ mỗi tháng.</p>
-        <a className="btn primary block" href="/api/backup" download>Tải bản sao lưu</a>
+
+      <h2>{t("set.backup_title")}</h2>
+      <div className="card">
+        <p className="mute" style={{ margin: "0 0 12px" }}>{t("set.backup_body")}</p>
+        <div className="row">
+          <a className="btn primary" href="/api/backup" download>{t("set.backup_btn")}</a>
+          <a className="btn ghost" href="/api/export" download>{t("set.export_btn")}</a>
+        </div>
+        <div style={{ borderTop: ".5px solid var(--line)", marginTop: 14, paddingTop: 12 }}>
+          <b>{t("set.restore_title")}</b>
+          <p className="mute" style={{ margin: "6px 0 10px" }}>{t("set.restore_warn")}</p>
+          <form action={restoreAction}>
+            <input type="file" name="file" accept="application/json,.json" required style={{ width: "100%", marginBottom: 8 }} aria-label={t("set.restore_title")} />
+            <ConfirmButton label={t("set.restore_btn")} message={t("set.restore_confirm")} />
+          </form>
+        </div>
       </div>
-      {process.env.APP_PASSWORD && <form action={logout} style={{ marginTop: 16 }}><button className="danger">Đăng xuất</button></form>}
-      <p className="mute">Tổng hợp tự gửi mỗi sáng khoảng 8:00 (giờ Việt Nam). Khi lưu phiếu hoặc cập nhật ODO mà có hạng mục mới tới hạn, bot báo ngay.</p>
+
+      {process.env.APP_PASSWORD && <form action={logout} style={{ marginTop: 16 }}><button className="danger">{t("set.logout")}</button></form>}
+      <p className="mute">{t("set.reminder_note")}</p>
     </>
   );
 }

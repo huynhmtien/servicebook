@@ -1,7 +1,19 @@
 import { all, get } from "./db.ts";
 import { normName } from "./util.ts";
-import { guessPart, keywordsFor } from "./parts.ts";
+import { GENERIC_KEY, guessPart, keywordsFor } from "./parts.ts";
 import { inferVat } from "./money.ts";
+import { parseAmount } from "./format.ts";
+import { LANGS, type Lang, type T } from "./i18n/index.ts";
+import type { I18n } from "./settings.ts";
+
+/** Ngữ cảnh cho AI: ngôn ngữ người dùng, loại tiền, đơn vị — để prompt đúng và kết quả khớp cài đặt. */
+export interface AiCtx { lang: Lang; languageName: string; locale: string; currency: string; digits: number; unit: string; taxRates: number[]; t: T }
+/** Thuế suất thường gặp để app tự suy ra thuế khi AI bỏ sót (chỉ khi chênh lệch khớp rất sát). */
+const TAX_RATES: Record<Lang, number[]> = { vi: [5, 8, 10], en: [5, 6, 7, 8, 10, 20] };
+export const aiContext = (i: I18n): AiCtx => ({
+  lang: i.lang, languageName: LANGS[i.lang].label, locale: LANGS[i.lang].locale, currency: i.fmt.currency, digits: i.fmt.digits,
+  unit: i.fmt.unit, taxRates: TAX_RATES[i.lang], t: i.t,
+});
 
 export interface DraftItem {
   raw_name: string; qty: number; amount: number; kind: "part" | "labor"; part_type_id: number | null;
@@ -31,29 +43,31 @@ export const activeProvider = (): Provider | null => providerOrder()[0] ?? null;
 export const scanEnabled = () => activeProvider() !== null;
 
 const SHAPE = `{
-  "garage": string (tên garage/đại lý, "" nếu không thấy),
+  "garage": string (garage / dealer / shop name, "" if not visible),
   "date": string|null (YYYY-MM-DD),
-  "odo": integer|null (số km đồng hồ),
-  "discount": integer (tổng giảm giá/chiết khấu, số dương, 0 nếu không có),
-  "vat": integer (tiền thuế GTGT in trên phiếu, 0 nếu không có),
-  "vat_rate": number|null (% thuế nếu in trên phiếu, ví dụ 8 hoặc 10),
-  "vat_included": boolean (true nếu phiếu ghi giá các dòng ĐÃ BAO GỒM VAT),
-  "slip_total": integer|null (tổng thanh toán cuối cùng trên phiếu, VNĐ),
-  "items": [ { "raw_name": string (đúng như in trên phiếu), "qty": number, "amount": integer (thành tiền dòng, VNĐ),
-               "kind": "part"|"labor", "part_type_id": integer, "confidence": number (0 đến 1) } ]
+  "odo": number|null (odometer reading as an integer),
+  "discount": number (total discount, positive, 0 if none),
+  "vat": number (tax amount printed on the slip: VAT/GST/sales tax, 0 if none),
+  "vat_rate": number|null (tax percentage if printed, e.g. 8 or 10),
+  "vat_included": boolean (true if the slip says line prices ALREADY INCLUDE tax),
+  "slip_total": number|null (final total paid on the slip),
+  "items": [ { "raw_name": string (exactly as printed), "qty": number, "amount": number (line total),
+               "kind": "part"|"labor", "part_type_id": integer, "confidence": number (0 to 1) } ]
 }`;
 
-function buildPrompt(parts: { id: number; name: string; category: string }[]): string {
+function buildPrompt(parts: { id: number; name: string; category: string }[], c: AiCtx): string {
   return (
-    `Đây là phiếu bảo dưỡng/sửa chữa ô tô tại Việt Nam. Trích xuất đầy đủ mọi dòng hạng mục (cả phụ tùng và tiền công). ` +
-    `Số tiền là VNĐ, bỏ dấu phân cách. Ngày trên phiếu thường dạng dd/mm/yyyy → đổi sang YYYY-MM-DD.\n\n` +
-    `TIỀN: "amount" của từng dòng giữ đúng như in trên phiếu. KHÔNG đưa các dòng tổng kết (Cộng tiền hàng, Thuế GTGT, Chiết khấu, Tổng thanh toán) vào "items" — ` +
-    `đặt chúng vào các trường "vat", "vat_rate", "discount", "slip_total". Nếu phiếu nói giá đã bao gồm VAT thì "vat_included" = true.\n\n` +
-    `Danh mục phân loại chuẩn (id: tên [nhóm]):\n${parts.map((p) => `${p.id}: ${p.name} [${p.category}]`).join("\n")}\n\n` +
-    `PHÂN LOẠI: mọi dòng đều phải gán một "part_type_id" từ danh mục trên. Dòng phụ tùng/dịch vụ khớp một linh kiện thì gán đúng linh kiện đó; ` +
-    `dòng tiền công thay/sửa một linh kiện cũng gán cùng id với linh kiện đó và kind = "labor"; công chung thì gán "Nhân công / công thợ chung"; ` +
-    `không khớp gì thì gán "Khác (chưa phân loại)". "confidence" là độ chắc chắn của phân loại (0–1). ` +
-    `Không bịa số liệu: trường nào không thấy trên phiếu thì để null / 0 / chuỗi rỗng.`
+    `This is a vehicle maintenance / repair invoice. It may be written in any language. Extract every line item (both parts and labor). ` +
+    `Money: amounts are in ${c.currency} unless the slip clearly shows another currency; write plain numbers with "." as the decimal separator and no thousands separators (e.g. 1234.5). ` +
+    `Dates: output YYYY-MM-DD; if a date is ambiguous (e.g. 03/04/2026) use the convention of locale ${c.locale}. ` +
+    `Odometer: report in ${c.unit}; convert if the slip uses another unit.\n\n` +
+    `MONEY RULES: keep each line's "amount" exactly as printed. Do NOT put summary rows (subtotal, tax/VAT/GST, discount, total) into "items" — ` +
+    `put them into "vat" (tax amount), "vat_rate", "discount" and "slip_total". If the slip says prices already include tax, set "vat_included" = true.\n\n` +
+    `Standard classification list (id: name [group]):\n${parts.map((p) => `${p.id}: ${p.name} [${p.category}]`).join("\n")}\n\n` +
+    `CLASSIFICATION: every line must get one "part_type_id" from the list above. A part/service line that matches a component gets that component; ` +
+    `a labor line for replacing/repairing a component gets the same id as that component with kind = "labor"; general labor gets the "General labor" id; ` +
+    `anything else gets "Other (uncategorized)". "confidence" is how sure you are about the classification (0–1). ` +
+    `Keep "raw_name" in the original language of the slip. Do not invent data: leave a field null / 0 / "" when it is not on the slip.`
   );
 }
 
@@ -62,18 +76,18 @@ const JSON_SCHEMA = {
   properties: {
     garage: { type: "string" },
     date: { type: ["string", "null"] },
-    odo: { type: ["integer", "null"] },
-    discount: { type: "integer" },
-    vat: { type: "integer" },
+    odo: { type: ["number", "null"] },
+    discount: { type: "number" },
+    vat: { type: "number" },
     vat_rate: { type: ["number", "null"] },
     vat_included: { type: "boolean" },
-    slip_total: { type: ["integer", "null"] },
+    slip_total: { type: ["number", "null"] },
     items: {
       type: "array",
       items: {
         type: "object",
         properties: {
-          raw_name: { type: "string" }, qty: { type: "number" }, amount: { type: "integer" },
+          raw_name: { type: "string" }, qty: { type: "number" }, amount: { type: "number" },
           kind: { type: "string", enum: ["part", "labor"] }, part_type_id: { type: ["integer", "null"] },
           confidence: { type: "number" },
         },
@@ -118,14 +132,14 @@ async function viaClaude(file: Buffer, mime: string, prompt: string): Promise<un
   const res = await claudeCall({
     max_tokens: 16000,
     output_config: { effort: "low" },
-    tools: [{ name: "submit_service_slip", description: "Nộp dữ liệu đã trích xuất từ phiếu bảo dưỡng.", input_schema: JSON_SCHEMA }],
+    tools: [{ name: "submit_service_slip", description: "Submit the data extracted from the service invoice.", input_schema: JSON_SCHEMA }],
     tool_choice: { type: "auto" },
     messages: [{ role: "user", content: [media(file, mime), { type: "text", text: `${prompt}\n\nGọi công cụ submit_service_slip để nộp kết quả.` }] }],
   });
   const block = res.content.find((b) => b.type === "tool_use");
   if (block) return block.input;
   const text = claudeText(res);
-  if (!text) throw new Error("AI không trả về dữ liệu có cấu trúc");
+  if (!text) throw new Error("The AI returned no structured data");
   return parseJson(text);
 }
 
@@ -149,7 +163,7 @@ export async function geminiCall(body: unknown): Promise<{ text: string; sources
   const j = (await res.json()) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
   const cand = j?.candidates?.[0];
   const text = cand?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("");
-  if (!text) throw new Error("Gemini không trả về nội dung");
+  if (!text) throw new Error("Gemini returned no content");
   const chunks: { web?: { uri?: string; title?: string } }[] = cand?.groundingMetadata?.groundingChunks ?? [];
   const sources = chunks.filter((c) => c.web?.uri).map((c) => ({ title: c.web!.title ?? c.web!.uri!, url: c.web!.uri! }));
   return { text, sources };
@@ -164,7 +178,7 @@ async function viaGemini(file: Buffer, mime: string, prompt: string, shape = SHA
 }
 
 async function viaDeepseek(file: Buffer, mime: string, prompt: string, shape = SHAPE): Promise<unknown> {
-  if (mime === "application/pdf") throw new Error("DeepSeek chưa đọc được PDF — hãy chụp/tải ảnh JPG/PNG, hoặc dùng Gemini/Claude");
+  if (mime === "application/pdf") throw new Error("DeepSeek cannot read PDFs yet — use a JPG/PNG photo, or Gemini/Claude");
   const res = await fetch((process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com") + "/chat/completions", {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}` },
@@ -184,7 +198,7 @@ async function viaDeepseek(file: Buffer, mime: string, prompt: string, shape = S
   if (!res.ok) throw new Error(`DeepSeek ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const j = (await res.json()) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
   const text = j?.choices?.[0]?.message?.content;
-  if (!text) throw new Error("DeepSeek không trả về nội dung");
+  if (!text) throw new Error("DeepSeek returned no content");
   return parseJson(text);
 }
 
@@ -196,7 +210,7 @@ export function parseJson(text: string): unknown {
   } catch {
     const a = t.indexOf("{"), b = t.lastIndexOf("}");
     if (a >= 0 && b > a) return JSON.parse(t.slice(a, b + 1));
-    throw new Error("AI trả về dữ liệu không phải JSON");
+    throw new Error("The AI response was not JSON");
   }
 }
 
@@ -205,13 +219,20 @@ const toInt = (v: unknown): number | null => {
   const n = Number(String(v).replace(/[.,\s]/g, ""));
   return Number.isFinite(n) ? Math.round(n) : null;
 };
+/** Số tiền AI trả về (đơn vị chính, có thể có phần thập phân) → đơn vị nhỏ nhất của loại tiền. */
+const toMinor = (v: unknown, digits: number): number | null => {
+  if (v == null || v === "") return null;
+  if (typeof v === "number") return Number.isFinite(v) ? Math.round(v * 10 ** digits) : null;
+  const s = String(v).trim();
+  return /\d/.test(s) ? parseAmount(s, digits) : null;
+};
 const toRate = (v: unknown): number | null => {
   const n = Number(String(v ?? "").replace(",", "."));
   return Number.isFinite(n) && n > 0 && n <= 30 ? n : null;
 };
 
 /** Ép dữ liệu thô từ AI về đúng kiểu, bỏ dòng rỗng; model nào cũng qua bước này. */
-export function normalizeDraft(raw: unknown, validParts: Set<number>): Draft {
+export function normalizeDraft(raw: unknown, validParts: Set<number>, digits = 0): Draft {
   const r = (raw ?? {}) as Record<string, unknown>;
   const date = typeof r.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? r.date : null;
   const items: DraftItem[] = (Array.isArray(r.items) ? r.items : [])
@@ -223,7 +244,7 @@ export function normalizeDraft(raw: unknown, validParts: Set<number>): Draft {
       return {
         raw_name: String(x.raw_name ?? "").trim(),
         qty: Number.isFinite(qty) && qty > 0 ? qty : 1,
-        amount: toInt(x.amount) ?? 0,
+        amount: toMinor(x.amount, digits) ?? 0,
         kind: x.kind === "labor" ? "labor" : "part",
         part_type_id: ok ? pid : null,
         how: ok ? "ai" : null,
@@ -232,16 +253,16 @@ export function normalizeDraft(raw: unknown, validParts: Set<number>): Draft {
     })
     .filter((x) => x.raw_name);
   return {
-    garage: String(r.garage ?? "").trim(), date, odo: toInt(r.odo), slip_total: toInt(r.slip_total),
-    discount: Math.max(0, toInt(r.discount) ?? 0), vat: Math.max(0, toInt(r.vat) ?? 0), vat_rate: toRate(r.vat_rate),
+    garage: String(r.garage ?? "").trim(), date, odo: toInt(r.odo), slip_total: toMinor(r.slip_total, digits),
+    discount: Math.max(0, toMinor(r.discount, digits) ?? 0), vat: Math.max(0, toMinor(r.vat, digits) ?? 0), vat_rate: toRate(r.vat_rate),
     vat_included: r.vat_included === true, items,
   };
 }
 
 /** Lớp xử lý sau AI: bộ nhớ đã xác nhận → (giữ kết quả AI) → từ khóa tự động; rồi suy ra VAT nếu AI bỏ sót. */
-export async function refineDraft(d: Draft, parts: { id: number; name: string }[]): Promise<Draft> {
+export async function refineDraft(d: Draft, parts: { id: number; key: string | null; name: string }[], taxRates?: number[]): Promise<Draft> {
   const kwParts = parts.map((p) => ({ id: p.id, kw: keywordsFor(p.name) }));
-  const generic = parts.find((p) => p.name.startsWith("Khác (chưa"))?.id;
+  const generic = parts.find((p) => p.key === GENERIC_KEY)?.id;
   for (const it of d.items) {
     const alias = await get<{ part_type_id: number }>("SELECT part_type_id FROM part_aliases WHERE alias = ?", normName(it.raw_name));
     if (alias) { it.part_type_id = alias.part_type_id; it.how = "memory"; it.confidence = 1; continue; }
@@ -253,7 +274,7 @@ export async function refineDraft(d: Draft, parts: { id: number; name: string }[
     if (it.part_type_id === generic) { it.how = it.how ?? "ai"; it.confidence = Math.min(it.confidence ?? 0.3, 0.3); }
   }
   const sum = d.items.reduce((a, b) => a + b.amount, 0);
-  const iv = inferVat(sum, d.discount, d.vat, d.slip_total);
+  const iv = inferVat(sum, d.discount, d.vat, d.slip_total, taxRates);
   if (iv.inferred) { d.vat = iv.vat; d.vat_rate = iv.rate; d.vat_inferred = true; d.vat_included = false; }
   return d;
 }
@@ -267,24 +288,24 @@ export async function visionJson(provider: Provider, file: Buffer, mime: string,
     messages: [{ role: "user", content: [media(file, mime), { type: "text", text: `${prompt}\n\nChỉ trả về JSON đúng dạng:\n${shape}` }] }],
   });
   const text = claudeText(res);
-  if (!text) throw new Error("Claude không trả về nội dung");
+  if (!text) throw new Error("Claude returned no content");
   return parseJson(text);
 }
 
 const RUN = { claude: viaClaude, gemini: viaGemini, deepseek: viaDeepseek } as const;
 
-export async function extractSlip(file: Buffer, mime: string): Promise<Draft & { provider: Provider }> {
+export async function extractSlip(file: Buffer, mime: string, ctx: AiCtx): Promise<Draft & { provider: Provider }> {
   const order = providerOrder();
-  if (!order.length) throw new Error("Chưa cấu hình khóa AI trong .env");
-  const parts = await all<{ id: number; name: string; category: string }>("SELECT id, name, category FROM part_types ORDER BY id");
-  const prompt = buildPrompt(parts);
+  if (!order.length) throw new Error(ctx.t("ai.no_key"));
+  const parts = await all<{ id: number; key: string | null; name: string; category: string }>("SELECT id, key, name, category FROM part_types ORDER BY id");
+  const prompt = buildPrompt(parts, ctx);
   const errors: string[] = [];
   for (const provider of order) {
     try {
       const raw = await RUN[provider](file, mime, prompt);
-      const d = normalizeDraft(raw, new Set(parts.map((p) => p.id)));
-      if (!d.items.length) throw new Error("không đọc được dòng hạng mục nào");
-      return { ...(await refineDraft(d, parts)), provider };
+      const d = normalizeDraft(raw, new Set(parts.map((p) => p.id)), ctx.digits);
+      if (!d.items.length) throw new Error(ctx.t("ai.no_lines"));
+      return { ...(await refineDraft(d, parts, ctx.taxRates)), provider };
     } catch (e) {
       errors.push(`${provider}: ${e instanceof Error ? e.message : e}`);
     }

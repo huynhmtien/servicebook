@@ -6,7 +6,7 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "observability": { "enabled": true },
-  "triggers": { "crons": ["0 1 * * *"] },
+  "triggers": { "crons": ["0 * * * *"] },
   "d1_databases": [
     { "binding": "DB", "database_name": "servicebook", "database_id": "REPLACE_WITH_YOUR_D1_ID", "migrations_dir": "migrations" }
   ]

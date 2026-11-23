@@ -1,16 +1,17 @@
 import { all, get, run, insert, batch, type Stmt } from "./db.ts";
 import { evaluateRule, avgKmPerDay, type RuleResult } from "./rules.ts";
 import { today } from "./util.ts";
-import { COST_ONLY, keywordsFor } from "./parts.ts";
+import { COST_ONLY, categoryRank, keywordsFor } from "./parts.ts";
+import type { DistanceUnit } from "./format.ts";
 
 export interface Vehicle {
-  id: number; name: string; plate: string | null; model: string | null; year: number | null; odo: number;
+  id: number; name: string; plate: string | null; model: string | null; year: number | null; odo: number; fuel: string | null;
 }
 export interface PartType {
-  id: number; name: string; category: string; default_km: number | null; default_months: number | null;
+  id: number; key: string | null; name: string; category: string; default_km: number | null; default_months: number | null;
 }
 export interface RuleRow extends RuleResult {
-  ruleId: number; vehicleId: number; partTypeId: number; partName: string; category: string;
+  ruleId: number; vehicleId: number; partTypeId: number; partKey: string | null; partName: string; category: string;
   intervalKm: number | null; intervalMonths: number | null; enabled: boolean;
   source: string; sourceNote: string | null; sourceUrl: string | null;
   last: { date: string; odo: number | null; garage: string | null; amount: number } | null;
@@ -20,16 +21,28 @@ export const listVehicles = () => all<Vehicle>("SELECT * FROM vehicles ORDER BY 
 export const getVehicle = (id: number) => get<Vehicle>("SELECT * FROM vehicles WHERE id = ?", id);
 export interface PartTypeKw extends PartType { kw: string[] }
 export const listPartTypes = async (): Promise<PartTypeKw[]> =>
-  (await all<PartType>("SELECT * FROM part_types ORDER BY (category = ?), category, name", COST_ONLY)).map((p) => ({ ...p, kw: keywordsFor(p.name) }));
+  (await all<PartType>("SELECT * FROM part_types ORDER BY id"))
+    .sort((a, b) => categoryRank(a.category) - categoryRank(b.category) || a.id - b.id)
+    .map((p) => ({ ...p, kw: keywordsFor(p.name) }));
 
-export async function createVehicle(v: Omit<Vehicle, "id">): Promise<number> {
+/** Linh kiện không áp dụng cho từng loại nhiên liệu (tự tắt theo dõi khi tạo xe; bật lại được trong trang xe). */
+const NOT_APPLICABLE: Record<string, string[]> = {
+  diesel: ["spark_plugs"],
+  electric: ["engine_oil", "oil_filter", "air_filter", "fuel_filter", "spark_plugs", "drive_belt", "injector_cleaning"],
+};
+
+export async function createVehicle(v: Omit<Vehicle, "id">, opts: { distance: DistanceUnit } = { distance: "km" }): Promise<number> {
   const id = await insert(
-    "INSERT INTO vehicles (name, plate, model, year, odo) VALUES (?,?,?,?,?)",
-    v.name, v.plate, v.model, v.year, v.odo,
+    "INSERT INTO vehicles (name, plate, model, year, odo, fuel) VALUES (?,?,?,?,?,?)",
+    v.name, v.plate, v.model, v.year, v.odo, v.fuel,
   );
+  // chu kỳ mặc định tính theo km; nếu dùng dặm thì quy đổi và làm tròn tới 500
+  const km = opts.distance === "mi" ? "CAST(ROUND(default_km * 0.621371 / 500.0) * 500 AS INTEGER)" : "default_km";
+  const off = NOT_APPLICABLE[v.fuel ?? ""] ?? [];
   await batch([
-    [`INSERT INTO rules (vehicle_id, part_type_id, interval_km, interval_months)
-      SELECT ?, id, default_km, default_months FROM part_types WHERE category <> ?`, id, COST_ONLY],
+    [`INSERT INTO rules (vehicle_id, part_type_id, interval_km, interval_months, enabled)
+      SELECT ?, id, ${km}, default_months, CASE WHEN key IN (${off.map(() => "?").join(",") || "NULL"}) THEN 0 ELSE 1 END
+      FROM part_types WHERE category <> ?`, id, ...off, COST_ONLY],
     ...(v.odo > 0 ? [["INSERT INTO odometer_logs (vehicle_id, km, date) VALUES (?,?,?)", id, v.odo, today()] as Stmt] : []),
   ]);
   return id;
@@ -60,11 +73,11 @@ export async function vehicleRules(vehicleId: number): Promise<RuleRow[]> {
   const t = today();
   const rules = await all<{
     id: number; part_type_id: number; interval_km: number | null; interval_months: number | null;
-    enabled: number; name: string; category: string; source: string; source_note: string | null; source_url: string | null;
+    enabled: number; key: string | null; name: string; category: string; source: string; source_note: string | null; source_url: string | null;
   }>(
-    `SELECT r.id, r.part_type_id, r.interval_km, r.interval_months, r.enabled, r.source, r.source_note, r.source_url, p.name, p.category
+    `SELECT r.id, r.part_type_id, r.interval_km, r.interval_months, r.enabled, r.source, r.source_note, r.source_url, p.key, p.name, p.category
      FROM rules r JOIN part_types p ON p.id = r.part_type_id WHERE r.vehicle_id = ?
-     ORDER BY p.category, p.name`, vehicleId,
+     ORDER BY p.id`, vehicleId,
   );
   // một truy vấn cho mọi linh kiện (trước đây: 1 truy vấn / linh kiện → ~40 lần mỗi lần mở trang)
   const lastRows = await all<{ part_type_id: number; date: string; odo: number | null; garage: string | null; amount: number }>(
@@ -78,6 +91,7 @@ export async function vehicleRules(vehicleId: number): Promise<RuleRow[]> {
     vehicleId,
   );
   const lastBy = new Map(lastRows.map((l) => [l.part_type_id, l]));
+  rules.sort((a, b) => categoryRank(a.category) - categoryRank(b.category) || a.id - b.id);
   return rules.map((r) => {
     const last = lastBy.get(r.part_type_id);
     const res = evaluateRule({
@@ -86,7 +100,7 @@ export async function vehicleRules(vehicleId: number): Promise<RuleRow[]> {
       vehicleOdo: v.odo, today: t, avgKmPerDay: avg,
     });
     return {
-      ...res, ruleId: r.id, vehicleId, partTypeId: r.part_type_id, partName: r.name,
+      ...res, ruleId: r.id, vehicleId, partTypeId: r.part_type_id, partKey: r.key, partName: r.name,
       category: r.category, intervalKm: r.interval_km, intervalMonths: r.interval_months,
       enabled: !!r.enabled, last: last ? { date: last.date, odo: last.odo, garage: last.garage, amount: last.amount } : null,
       source: r.source, sourceNote: r.source_note, sourceUrl: r.source_url,

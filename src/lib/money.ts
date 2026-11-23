@@ -15,16 +15,16 @@ export function reconcile(m: Money, slipTotal: number | null): { expected: numbe
   return { expected, diff, ok: Math.abs(diff) <= 1 };
 }
 
-const RATES = [5, 8, 10];
+const DEFAULT_RATES = [5, 8, 10];
 
-/** AI hay bỏ sót VAT: nếu tổng trên phiếu hơn (cộng hàng − giảm giá) đúng 5/8/10% thì suy ra VAT. */
-export function inferVat(sum: number, discount: number, vat: number, slipTotal: number | null): { vat: number; rate: number | null; inferred: boolean } {
+/** AI hay bỏ sót thuế: nếu tổng trên phiếu hơn (cộng hàng − giảm giá) đúng một thuế suất thường gặp thì suy ra thuế. */
+export function inferVat(sum: number, discount: number, vat: number, slipTotal: number | null, rates: number[] = DEFAULT_RATES): { vat: number; rate: number | null; inferred: boolean } {
   if (vat > 0 || slipTotal == null) return { vat, rate: null, inferred: false };
   const base = sum - discount;
   const diff = slipTotal - base;
   if (base <= 0 || diff <= 1) return { vat: 0, rate: null, inferred: false };
   const ratio = diff / base;
-  const rate = RATES.find((r) => Math.abs(ratio - r / 100) <= 0.004);
+  const rate = rates.find((r) => Math.abs(ratio - r / 100) <= 0.004);
   return rate ? { vat: diff, rate, inferred: true } : { vat: 0, rate: null, inferred: false };
 }
 

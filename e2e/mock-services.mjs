@@ -3,6 +3,7 @@
 import http from "node:http";
 let mode = "ok";
 const log = [];
+const bodies = []; // thân yêu cầu (để kiểm tra nội dung tin nhắn/webhook)
 // Phiếu mặc định: AI đọc nhầm 1 dòng thừa, bỏ sót VAT; "Lọc gió cabin" AI không phân loại được (từ khóa sẽ nhận ra)
 const BASE = { garage: "Toyota Tân Cảng", date: "2026-09-20", odo: 49500, discount: 0, vat: 0, vat_rate: null, vat_included: false };
 const GOOD = [
@@ -31,14 +32,17 @@ http.createServer((req, res) => {
     if (url.startsWith("/__mode/")) { mode = url.split("/")[2]; return j(200, { mode }); }
     if (url.startsWith("/__draft/")) { draft = url.split("/")[2]; return j(200, { draft }); }
     if (url === "/__log") return j(200, log);
+    if (url === "/__bodies") return j(200, bodies);
     log.push(`${req.method} ${url}`);
+    bodies.push({ url, body: b });
     if (url.includes(":generateContent")) {
       if (b.includes("google_search")) // tra cứu web: có kèm nguồn (grounding)
         return j(200, { candidates: [{ content: { parts: [{ text: "```json\n" + JSON.stringify(INTERVALS) + "\n```" }] },
           groundingMetadata: { groundingChunks: [{ web: { uri: "https://example.com/toyota-fortuner-lich-bao-duong", title: "Lịch bảo dưỡng Fortuner" } }] } }] });
-      if (b.includes("BẢNG CHU KỲ")) return j(200, { candidates: [{ content: { parts: [{ text: JSON.stringify({ ...INTERVALS, items: INTERVALS.items.slice(0, 2).map((x) => ({ ...x, source_url: null, confidence: "high" })) }) }] } }] });
+      if (b.includes("MAINTENANCE INTERVAL TABLE")) return j(200, { candidates: [{ content: { parts: [{ text: JSON.stringify({ ...INTERVALS, items: INTERVALS.items.slice(0, 2).map((x) => ({ ...x, source_url: null, confidence: "high" })) }) }] } }] });
       return j(200, { candidates: [{ content: { parts: [{ text: JSON.stringify(DRAFTS[draft]) }] } }] });
     }
+    if (url.includes("/setWebhook")) return j(200, { ok: true, result: true });
     if (url.includes("/getMe")) return mode === "badtoken" ? j(404, { ok: false, error_code: 404, description: "Not Found" }) : j(200, { ok: true, result: { username: "servicebook_bot" } });
     if (url.includes("/sendMessage")) {
       if (mode === "nochat") return j(400, { ok: false, error_code: 400, description: "Bad Request: chat not found" });

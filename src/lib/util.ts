@@ -1,4 +1,9 @@
-export const TZ = process.env.APP_TZ || "Asia/Ho_Chi_Minh";
+/** Múi giờ chạy: lấy từ cài đặt (settings.ts gọi setTz mỗi request); app một chủ nên giá trị toàn cục là an toàn. */
+let TZ = process.env.APP_TZ || "UTC";
+/** Dấu hiệu cố định (không phụ thuộc ngôn ngữ) cho phiếu tạo ra ở bước "nhập lần thay ban đầu". */
+export const INITIAL_NOTE = "__initial__";
+export const setTz = (z: string) => { TZ = z; };
+export const getTz = () => TZ;
 
 export function today(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: TZ });
@@ -23,16 +28,6 @@ export function addMonths(d: string, n: number): string {
   const nm = (total % 12) + 1;
   const last = new Date(Date.UTC(ny, nm, 0)).getUTCDate();
   return `${ny}-${String(nm).padStart(2, "0")}-${String(Math.min(day, last)).padStart(2, "0")}`;
-}
-
-export const vnd = (n: number) =>
-  new Intl.NumberFormat("vi-VN").format(Math.round(n)) + " ₫";
-export const num = (n: number) => new Intl.NumberFormat("vi-VN").format(Math.round(n));
-
-export function fmtDate(d: string | null | undefined): string {
-  if (!d) return "—";
-  const [y, m, day] = d.split("-");
-  return `${day}/${m}/${y}`;
 }
 
 export function normName(s: string): string {

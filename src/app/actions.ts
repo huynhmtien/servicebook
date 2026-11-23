@@ -5,12 +5,15 @@ import { AUTH_COOKIE, SESSION_DAYS, makeSession, passwordMatches, safeNext } fro
 import { revalidatePath } from "next/cache";
 import { all, get, run, insert, batch, type Stmt } from "../lib/db.ts";
 import { createVehicle, getVehicle, setOdo, setOdoStmts, upsertGarage } from "../lib/queries.ts";
-import { extractSlip, scanEnabled, supportedMime } from "../lib/extract.ts";
+import { aiContext, extractSlip, scanEnabled, supportedMime } from "../lib/extract.ts";
 import { extractIntervalsFromDoc, researchIntervals, type IntervalProposal } from "../lib/intervals.ts";
 import { expectedTotal, netFactor } from "../lib/money.ts";
 import { notifyEscalations, sendDigest } from "../lib/notify.ts";
-import { telegramDiagnose, type Step } from "../lib/telegram.ts";
-import { normName, today } from "../lib/util.ts";
+import { telegramDiagnose, setTelegramWebhook, telegramConfigured, type Step } from "../lib/telegram.ts";
+import { webhookSecret } from "../lib/telegram-bot.ts";
+import { getI18n, saveSettings } from "../lib/settings.ts";
+import { restoreBackup } from "../lib/backup.ts";
+import { INITIAL_NOTE, normName, today } from "../lib/util.ts";
 
 /** Quay lại trang kèm thông báo "đã xong" để người dùng luôn thấy phản hồi. */
 const done = (path: string, msg: string): never => {
@@ -24,33 +27,45 @@ const fail = (path: string, msg: string): never => {
 };
 
 const s = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
+/** Số nguyên (ODO, km, tháng, năm): bỏ mọi dấu phân cách nghìn kiểu vi/en (48.500 / 48,500 / 48 500). */
 const n = (f: FormData, k: string): number | null => {
-  const v = s(f, k).replace(/[.\s]/g, "").replace(",", ".");
+  const v = s(f, k).replace(/[^\d-]/g, "");
+  if (v === "" || v === "-") return null;
+  const x = Number(v);
+  return Number.isFinite(x) ? x : null;
+};
+/** Số thập phân (số lượng, thuế suất): chấp nhận dấu , hoặc . */
+const dec = (f: FormData, k: string): number | null => {
+  const v = s(f, k).replace(/\s/g, "").replace(",", ".");
   if (v === "") return null;
   const x = Number(v);
   return Number.isFinite(x) ? x : null;
 };
 
 export async function addVehicle(f: FormData) {
+  const { t, settings } = await getI18n();
   const name = s(f, "name");
   if (!name) return;
+  const fuel = ["diesel", "petrol", "hybrid", "electric"].includes(s(f, "fuel")) ? s(f, "fuel") : null;
   const id = await createVehicle({
     name, plate: s(f, "plate") || null, model: s(f, "model") || null,
-    year: n(f, "year"), odo: n(f, "odo") ?? 0,
-  });
-  done(`/vehicles/${id}/setup`, "Đã thêm xe. Nhập lần thay gần nhất của các hạng mục anh nhớ (hoặc bỏ qua).");
+    year: n(f, "year"), odo: n(f, "odo") ?? 0, fuel,
+  }, { distance: settings.distance });
+  done(`/vehicles/${id}/setup`, t("act.vehicle_added"));
 }
 
 export async function deleteVehicle(f: FormData) {
+  const { t } = await getI18n();
   await run("DELETE FROM vehicles WHERE id = ?", Number(f.get("id")));
   revalidatePath("/", "layout");
-  done("/vehicles", "Đã xóa xe.");
+  done("/vehicles", t("act.vehicle_deleted"));
 }
 
 export async function updateVehicle(f: FormData) {
+  const { t } = await getI18n();
   const id = Number(f.get("id"));
   const name = s(f, "name");
-  if (!name) return fail(`/vehicles/${id}`, "Tên xe không được để trống.");
+  if (!name) return fail(`/vehicles/${id}`, t("act.name_required"));
   const odo = n(f, "odo");
   await run("UPDATE vehicles SET name = ?, plate = ?, model = ?, year = ? WHERE id = ?",
     name, s(f, "plate") || null, s(f, "model") || null, n(f, "year"), id);
@@ -58,80 +73,87 @@ export async function updateVehicle(f: FormData) {
   if (odo != null && odo >= 0 && cur && odo !== cur.odo) await setOdo(id, odo, today(), true);
   await notifyEscalations();
   revalidatePath("/", "layout");
-  done(`/vehicles/${id}`, "Đã lưu thông tin xe.");
+  done(`/vehicles/${id}`, t("act.vehicle_saved"));
 }
 
 export async function updateOdo(f: FormData) {
+  const { t, fmt } = await getI18n();
   const id = Number(f.get("vehicle_id"));
   const back = safeNext(String(f.get("back") ?? "/"));
   const km = n(f, "km");
-  if (km == null || km < 0) return fail(back, "ODO không hợp lệ — nhập số km, ví dụ 48500.");
+  if (km == null || km < 0) return fail(back, t("act.odo_invalid"));
   const cur = await get<{ odo: number }>("SELECT odo FROM vehicles WHERE id = ?", id);
   await setOdo(id, km, today(), true);
   await notifyEscalations();
   revalidatePath("/", "layout");
   done(back, cur && km < cur.odo
-    ? `Đã chỉnh ODO về ${km.toLocaleString("vi-VN")} km (trước đó ${cur.odo.toLocaleString("vi-VN")} km).`
-    : `Đã cập nhật ODO: ${km.toLocaleString("vi-VN")} km.`);
+    ? t("act.odo_lowered", { km: fmt.num(km), prev: fmt.num(cur.odo), unit: fmt.unit })
+    : t("act.odo_updated", { km: fmt.num(km), unit: fmt.unit }));
 }
 
 export async function saveRules(f: FormData) {
+  const { t } = await getI18n();
   const vid = Number(f.get("vehicle_id"));
   const stmts: Stmt[] = [];
   for (const r of await all<{ id: number; interval_km: number | null; interval_months: number | null }>(
     "SELECT id, interval_km, interval_months FROM rules WHERE vehicle_id = ?", vid)) {
     const km = n(f, `km_${r.id}`), mo = n(f, `mo_${r.id}`);
     const changed = km !== r.interval_km || mo !== r.interval_months;
-    // người dùng tự sửa số → đánh dấu nguồn "anh tự đặt" (hết nhãn mặc định/AI)
+    // người dùng tự sửa số → đánh dấu nguồn "người dùng tự đặt" (hết nhãn mặc định/AI)
     stmts.push([
       `UPDATE rules SET interval_km = ?, interval_months = ?, enabled = ?${changed ? ", source = 'user', source_note = NULL, source_url = NULL" : ""} WHERE id = ?`,
       km, mo, f.get(`on_${r.id}`) ? 1 : 0, r.id]);
   }
   await batch(stmts);
   revalidatePath("/", "layout");
-  done(`/vehicles/${vid}`, "Đã lưu chu kỳ.");
+  done(`/vehicles/${vid}`, t("act.intervals_saved"));
 }
 
 /** Tra cứu chu kỳ chuẩn theo dòng xe (AI tìm web) → màn hình duyệt. */
 export async function researchIntervalsAction(f: FormData) {
+  const i18n = await getI18n();
+  const { t } = i18n;
   const vid = Number(f.get("vehicle_id"));
   const v = await getVehicle(vid);
-  if (!v) return fail("/vehicles", "Không tìm thấy xe.");
-  if (!v.model && !v.year) return fail(`/vehicles/${vid}`, "Hãy điền hãng/dòng xe và năm sản xuất (mục “Sửa thông tin xe”) để tra cứu đúng xe.");
+  if (!v) return fail("/vehicles", t("act.vehicle_not_found"));
+  if (!v.model && !v.year) return fail(`/vehicles/${vid}`, t("act.need_model_year"));
   let id: number;
   try {
-    const p = await researchIntervals(v);
+    const p = await researchIntervals(v, aiContext(i18n));
     id = await insert("INSERT INTO drafts (vehicle_id, data) VALUES (?,?)", vid, JSON.stringify(p));
   } catch (e) {
-    return fail(`/vehicles/${vid}`, ("Không tra cứu được chu kỳ. " + (e instanceof Error ? e.message : e)).slice(0, 400));
+    return fail(`/vehicles/${vid}`, t("act.research_failed", { detail: e instanceof Error ? e.message : String(e) }).slice(0, 400));
   }
   redirect(`/vehicles/${vid}/intervals/${id}`);
 }
 
 /** Đọc bảng bảo dưỡng chụp từ sổ hướng dẫn → màn hình duyệt. */
 export async function scanIntervalDoc(f: FormData) {
+  const i18n = await getI18n();
+  const { t } = i18n;
   const vid = Number(f.get("vehicle_id"));
   const file = f.get("file");
-  if (!(file instanceof File) || file.size === 0) return fail(`/vehicles/${vid}`, "Chưa chọn ảnh bảng bảo dưỡng.");
+  if (!(file instanceof File) || file.size === 0) return fail(`/vehicles/${vid}`, t("act.no_doc_file"));
   const mime = (file as File).type;
   const buf = Buffer.from(await (file as File).arrayBuffer());
   let id: number;
   try {
-    if (!supportedMime(mime)) return fail(`/vehicles/${vid}`, "Chỉ hỗ trợ ảnh JPG/PNG/WEBP hoặc PDF.");
-    const p = await extractIntervalsFromDoc({ id: vid }, buf, mime); // ảnh chỉ gửi cho AI đọc, không lưu
+    if (!supportedMime(mime)) return fail(`/vehicles/${vid}`, t("act.bad_mime"));
+    const p = await extractIntervalsFromDoc({ id: vid }, buf, mime, aiContext(i18n)); // ảnh chỉ gửi cho AI đọc, không lưu
     id = await insert("INSERT INTO drafts (vehicle_id, data) VALUES (?,?)", vid, JSON.stringify(p));
   } catch (e) {
-    return fail(`/vehicles/${vid}`, ("Không đọc được bảng bảo dưỡng. " + (e instanceof Error ? e.message : e)).slice(0, 400));
+    return fail(`/vehicles/${vid}`, t("act.doc_failed", { detail: e instanceof Error ? e.message : String(e) }).slice(0, 400));
   }
   redirect(`/vehicles/${vid}/intervals/${id}`);
 }
 
 /** Áp dụng các dòng người dùng đã duyệt. */
 export async function applyIntervals(f: FormData) {
+  const { t } = await getI18n();
   const vid = Number(f.get("vehicle_id"));
   const draftId = Number(f.get("draft_id"));
   const d = await get<{ data: string }>("SELECT data FROM drafts WHERE id = ?", draftId);
-  if (!d) return fail(`/vehicles/${vid}`, "Phiên duyệt đã hết hạn, hãy tra cứu lại.");
+  if (!d) return fail(`/vehicles/${vid}`, t("act.draft_expired"));
   const p = JSON.parse(d.data) as IntervalProposal;
   const stmts: Stmt[] = [];
   for (const it of p.items) {
@@ -147,11 +169,12 @@ export async function applyIntervals(f: FormData) {
   stmts.push(["DELETE FROM drafts WHERE id = ?", draftId]);
   await batch(stmts);
   revalidatePath("/", "layout");
-  done(`/vehicles/${vid}`, applied ? `Đã áp dụng chu kỳ cho ${applied} linh kiện.` : "Chưa chọn dòng nào để áp dụng.");
+  done(`/vehicles/${vid}`, applied ? t("act.intervals_applied", { count: applied }) : t("act.intervals_none"));
 }
 
 /** Dữ liệu ban đầu: mỗi linh kiện nhập lần thay gần nhất (ngày + km). */
 export async function saveSetup(f: FormData) {
+  const { t } = await getI18n();
   const vid = Number(f.get("vehicle_id"));
   const groups = new Map<string, number[]>();
   for (const p of await all<{ id: number }>("SELECT id FROM part_types")) {
@@ -166,7 +189,7 @@ export async function saveSetup(f: FormData) {
     const [date, km] = key.split("|");
     const odo = km === "" ? null : Number(km);
     const rid = await insert("INSERT INTO service_records (vehicle_id, date, odo, total, note) VALUES (?,?,?,?,?)",
-      vid, date, odo, 0, "Nhập dữ liệu ban đầu");
+      vid, date, odo, 0, INITIAL_NOTE);
     await batch([
       ...parts.map((pid): Stmt => ["INSERT INTO service_items (record_id, part_type_id, raw_name, qty, amount, unit_price, kind) VALUES (?,?,?,?,?,?,?)",
         rid, pid, names.get(pid) ?? "", 1, 0, 0, "part"]),
@@ -175,13 +198,14 @@ export async function saveSetup(f: FormData) {
   }
   await notifyEscalations();
   revalidatePath("/", "layout");
-  done(`/vehicles/${vid}`, "Đã lưu lần thay ban đầu. Các hạng mục có dữ liệu đã được tính hạn.");
+  done(`/vehicles/${vid}`, t("act.setup_saved"));
 }
 
 const ROWS = 40;
 
 /** Lưu một phiếu (dùng cho nhập tay và duyệt kết quả scan). */
 export async function saveRecord(f: FormData) {
+  const { t, fmt } = await getI18n();
   const vid = Number(f.get("vehicle_id"));
   const date = s(f, "date") || today();
   const odo = n(f, "odo");
@@ -190,20 +214,20 @@ export async function saveRecord(f: FormData) {
   for (let i = 0; i < ROWS; i++) {
     const raw = s(f, `name_${i}`);
     if (!raw) continue;
-    const amount = Math.round(n(f, `amount_${i}`) ?? 0);
+    const amount = fmt.parse(s(f, `amount_${i}`)); // đơn vị nhỏ nhất của loại tiền
     items.push({
-      raw, part: n(f, `part_${i}`), qty: n(f, `qty_${i}`) || 1, amount,
+      raw, part: n(f, `part_${i}`), qty: dec(f, `qty_${i}`) || 1, amount,
       kind: s(f, `kind_${i}`) === "labor" ? "labor" : "part",
     });
   }
   if (items.length === 0) {
     const back = draftId0 ? `/scan/${draftId0}` : "/records/new?manual=1";
-    return fail(back, "Phiếu cần ít nhất một hạng mục.");
+    return fail(back, t("act.slip_needs_item"));
   }
   const subtotal = items.reduce((a, b) => a + b.amount, 0);
-  const discount = Math.max(0, Math.round(n(f, "discount") ?? 0));
-  const vat = Math.max(0, Math.round(n(f, "vat") ?? 0));
-  const vatRate = n(f, "vat_rate");
+  const discount = Math.max(0, fmt.parse(s(f, "discount")));
+  const vat = Math.max(0, fmt.parse(s(f, "vat")));
+  const vatRate = dec(f, "vat_rate");
   const vatIncluded = s(f, "vat_included") === "1";
   const total = expectedTotal({ sum: subtotal, discount, vat, vatIncluded });
   // giá từng dòng quy về trước thuế để so sánh giữa các garage cho công bằng
@@ -234,30 +258,34 @@ export async function saveRecord(f: FormData) {
   }
   await notifyEscalations();
   revalidatePath("/", "layout");
-  done(`/records/${id}`, "Đã lưu phiếu.");
+  done(`/records/${id}`, t("act.slip_saved"));
 }
 
 export async function deleteRecord(f: FormData) {
+  const { t } = await getI18n();
   await run("DELETE FROM service_records WHERE id = ?", Number(f.get("id")));
   revalidatePath("/", "layout");
-  done("/records", "Đã xóa phiếu.");
+  done("/records", t("act.slip_deleted"));
 }
 
 export async function scanSlip(f: FormData) {
-  if (!scanEnabled()) redirect("/records/new?error=" + encodeURIComponent("Chưa cấu hình khóa AI trong .env"));
+  const i18n = await getI18n();
+  const { t } = i18n;
+  const err = (m: string): never => redirect("/records/new?error=" + encodeURIComponent(m));
+  if (!scanEnabled()) err(t("act.no_ai_key"));
   const file = f.get("file");
   const vid = Number(f.get("vehicle_id"));
-  if (!(file instanceof File) || file.size === 0) redirect("/records/new?error=" + encodeURIComponent("Chưa chọn file"));
+  if (!(file instanceof File) || file.size === 0) err(t("act.no_file"));
   const buf = Buffer.from(await (file as File).arrayBuffer());
   const mime = (file as File).type;
-  if (!supportedMime(mime)) redirect("/records/new?error=" + encodeURIComponent("Chỉ hỗ trợ ảnh JPG/PNG/WEBP hoặc PDF"));
+  if (!supportedMime(mime)) err(t("act.bad_mime"));
   let id: number;
   try {
-    const draft = await extractSlip(buf, mime);
+    const draft = await extractSlip(buf, mime, aiContext(i18n)); // ảnh chỉ gửi cho AI đọc, không lưu
     id = await insert("INSERT INTO drafts (vehicle_id, data) VALUES (?,?)", vid, JSON.stringify(draft));
   } catch (e) {
-    console.error("[servicebook] scan lỗi:", e);
-    redirect(`/records/new?error=${encodeURIComponent(("Không đọc được phiếu — anh thử lại hoặc nhập tay. Chi tiết: " + (e instanceof Error ? e.message : e)).slice(0, 400))}`);
+    console.error("[servicebook] scan failed:", e);
+    return err(t("act.scan_failed", { detail: e instanceof Error ? e.message : String(e) }).slice(0, 400));
   }
   redirect(`/scan/${id}`);
 }
@@ -270,8 +298,53 @@ export async function testTelegram(_prev: TgState, _f: FormData): Promise<TgStat
 }
 
 export async function sendDigestNow(_prev: TgState, _f: FormData): Promise<TgState> {
+  const { t } = await getI18n();
   const r = await sendDigest(true);
-  return { ok: r === "Đã gửi" || r === "Không có cảnh báo", message: r === "Không có cảnh báo" ? "Không có cảnh báo nào cần gửi (đã gửi tin xác nhận mọi thứ ổn)." : r === "Đã gửi" ? "Đã gửi tổng hợp cảnh báo — kiểm tra Telegram." : r };
+  if (r.status === "none") return { ok: true, message: t("tg.digest_empty") };
+  if (r.status === "sent") return { ok: true, message: t("tg.digest_sent") };
+  return { ok: false, message: r.status === "not_configured" ? t("tg.not_configured") : r.error ?? "" };
+}
+
+/** Bật nhận tin trả lời từ bot (cập nhật ODO bằng tin nhắn). */
+export async function enableTelegramReplies(_prev: TgState, _f: FormData): Promise<TgState> {
+  const { t } = await getI18n();
+  const secret = await webhookSecret();
+  if (!telegramConfigured()) return { ok: false, message: t("tg.not_configured") };
+  if (!secret) return { ok: false, message: t("tg.webhook_need_secret") };
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (!host) return { ok: false, message: t("tg.webhook_fail", { detail: "no host" }) };
+  const proto = host.startsWith("localhost") || host.startsWith("127.") ? "http" : "https";
+  const r = await setTelegramWebhook(`${proto}://${host}/api/telegram`, secret);
+  return r.ok ? { ok: true, message: t("tg.webhook_ok") } : { ok: false, message: r.error };
+}
+
+/** Lưu cài đặt chung (ngôn ngữ, tiền tệ, đơn vị, thuế, múi giờ, giờ nhắc). */
+export async function saveSettingsAction(f: FormData) {
+  const before = await getI18n();
+  await saveSettings({
+    lang: s(f, "lang"), currency: s(f, "currency"), distance: s(f, "distance"),
+    taxLabel: s(f, "tax_label"), timezone: s(f, "timezone"), reminderHour: n(f, "reminder_hour") ?? 8,
+  });
+  revalidatePath("/", "layout");
+  const { t } = await getI18n(); // dùng ngôn ngữ mới để báo
+  void before;
+  done("/settings", t("set.saved"));
+}
+
+/** Khôi phục toàn bộ dữ liệu từ file sao lưu JSON. */
+export async function restoreAction(f: FormData) {
+  const { t } = await getI18n();
+  const file = f.get("file");
+  if (!(file instanceof File) || file.size === 0) return fail("/settings", t("set.restore_nofile"));
+  let counts;
+  try {
+    counts = await restoreBackup(await file.text());
+  } catch {
+    return fail("/settings", t("set.restore_bad"));
+  }
+  revalidatePath("/", "layout");
+  done("/settings", t("set.restore_ok", { vehicles: counts.vehicles, records: counts.records }));
 }
 
 const MAX_FAILS = 8, LOCK_MS = 15 * 60_000;

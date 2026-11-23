@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { AUTH_COOKIE, verifySession } from "./lib/auth";
 
-const PUBLIC = [/^\/login$/, /^\/manifest\.webmanifest$/, /^\/icon-\d+\.png$/, /^\/apple-touch-icon\.png$/, /^\/api\/cron$/];
+const PUBLIC = [/^\/login$/, /^\/manifest\.webmanifest$/, /^\/icon-\d+\.png$/, /^\/apple-touch-icon\.png$/, /^\/api\/cron$/, /^\/api\/telegram$/];
 
 /** Đặt APP_PASSWORD + SESSION_SECRET để bật đăng nhập (khuyên dùng vì app có địa chỉ công khai). */
 export async function middleware(req: NextRequest) {

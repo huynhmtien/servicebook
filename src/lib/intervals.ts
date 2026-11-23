@@ -1,6 +1,6 @@
 import { all } from "./db.ts";
 import { COST_ONLY } from "./parts.ts";
-import { claudeCall, claudeText, geminiCall, parseJson, providerOrder, visionJson, type Provider } from "./extract.ts";
+import { claudeCall, claudeText, geminiCall, parseJson, providerOrder, visionJson, type AiCtx, type Provider } from "./extract.ts";
 
 export interface IntervalItem {
   part_type_id: number; interval_km: number | null; interval_months: number | null;
@@ -11,11 +11,11 @@ export interface IntervalProposal {
   vehicle_desc: string; sources: { title: string; url: string }[]; caveats: string; items: IntervalItem[];
 }
 
-const SHAPE = `{
-  "vehicle_desc": string (xe/động cơ/đời xe mà các số liệu áp dụng),
-  "caveats": string (lưu ý: điều kiện vận hành, khác biệt theo động cơ, chỗ chưa chắc),
-  "items": [ { "part_type_id": integer, "interval_km": integer|null (km giữa 2 lần thay), "interval_months": integer|null (tháng giữa 2 lần thay),
-               "note": string (VD: điều kiện bình thường 10.000 km; khắc nghiệt 5.000 km), "source_url": string|null,
+const shape = (c: AiCtx) => `{
+  "vehicle_desc": string (the vehicle/engine/model year these numbers apply to),
+  "caveats": string (notes: operating conditions, differences by engine, anything uncertain — write in ${c.languageName}),
+  "items": [ { "part_type_id": integer, "interval_km": integer|null (distance between replacements, in ${c.unit}), "interval_months": integer|null (months between replacements),
+               "note": string (e.g. normal conditions 10,000; severe 5,000 — write in ${c.languageName}), "source_url": string|null,
                "confidence": "high"|"medium"|"low" } ]
 }`;
 
@@ -49,16 +49,17 @@ export function normalizeProposal(raw: unknown, valid: Set<number>, meta: { vehi
   return { kind: "intervals", ...meta, vehicle_desc: String(r.vehicle_desc ?? "").slice(0, 200), caveats: String(r.caveats ?? "").slice(0, 600), items };
 }
 
-function researchPrompt(desc: string, parts: { id: number; name: string }[]): string {
+function researchPrompt(desc: string, parts: { id: number; name: string }[], c: AiCtx): string {
   return (
-    `BẢNG CHU KỲ bảo dưỡng — hãy tìm trên web lịch bảo dưỡng CHÍNH THỨC của nhà sản xuất cho xe: ${desc}.\n` +
-    `Ưu tiên theo thứ tự: sổ hướng dẫn sử dụng / sổ bảo hành bảo dưỡng của hãng (đúng đời xe, đúng thị trường Việt Nam nếu có), ` +
-    `trang chính thức của hãng hoặc đại lý chính hãng tại Việt Nam, rồi mới đến nguồn uy tín khác.\n\n` +
-    `Danh sách linh kiện cần điền (id: tên):\n${parts.map((p) => `${p.id}: ${p.name}`).join("\n")}\n\n` +
-    `Quy tắc: CHỈ điền linh kiện mà nguồn nói rõ chu kỳ; không có nguồn thì BỎ QUA, tuyệt đối không đoán. ` +
-    `"confidence" = "high" chỉ khi trích từ tài liệu chính thức của hãng cho đúng xe này; "medium" khi từ đại lý/nguồn uy tín; "low" khi suy ra hoặc áp dụng cho xe tương tự. ` +
-    `Nếu hãng nêu cả điều kiện bình thường và khắc nghiệt (kẹt xe, bụi, đường xấu, chạy ngắn) thì dùng mức bình thường cho số chính và ghi mức khắc nghiệt vào "note". ` +
-    `Mỗi mục kèm "source_url" của trang đã dùng. Nếu xe có nhiều loại động cơ/hộp số mà anh không biết loại nào, nêu trong "caveats".`
+    `MAINTENANCE INTERVAL TABLE — search the web for the OFFICIAL maintenance schedule of the manufacturer for this vehicle: ${desc}.\n` +
+    `Prefer, in order: the manufacturer's owner's manual / service book (right model year, right market if available), ` +
+    `the manufacturer's official site or an authorized dealer, then other reputable sources.\n\n` +
+    `Parts to fill in (id: name):\n${parts.map((p) => `${p.id}: ${p.name}`).join("\n")}\n\n` +
+    `Rules: ONLY fill in a part when a source clearly states its interval; if there is no source, SKIP it — never guess. ` +
+    `Report distances in ${c.unit} (convert if the source uses another unit). ` +
+    `"confidence" = "high" only when quoted from the manufacturer's official document for this exact vehicle; "medium" for dealer/reputable sources; "low" when inferred or from a similar vehicle. ` +
+    `If the manufacturer gives both normal and severe conditions (traffic, dust, bad roads, short trips) use the normal value as the main number and mention severe in "note". ` +
+    `Give each item the "source_url" of the page used. If the vehicle has several engine/gearbox variants and you don't know which one, say so in "caveats".`
   );
 }
 
@@ -83,27 +84,27 @@ async function searchClaude(prompt: string): Promise<{ text: string; sources: { 
   return { text, sources: [...sources].map(([url, title]) => ({ title, url })) };
 }
 
-async function searchGemini(prompt: string): Promise<{ text: string; sources: { title: string; url: string }[] }> {
+async function searchGemini(prompt: string, shape: string): Promise<{ text: string; sources: { title: string; url: string }[] }> {
   return geminiCall({
-    contents: [{ parts: [{ text: `${prompt}\n\nSau khi tra cứu, chỉ trả về JSON đúng dạng (không thêm lời giải thích):\n${SHAPE}` }] }],
+    contents: [{ parts: [{ text: `${prompt}\n\nAfter researching, return ONLY JSON of exactly this shape (no explanations):\n${shape}` }] }],
     tools: [{ google_search: {} }],
     generationConfig: { temperature: 0 },
   });
 }
 
 /** Tra cứu chu kỳ chuẩn theo dòng xe. Kết quả chỉ là ĐỀ XUẤT — người dùng phải xác nhận. */
-export async function researchIntervals(vehicle: { id: number; name: string; model: string | null; year: number | null }): Promise<IntervalProposal> {
+export async function researchIntervals(vehicle: { id: number; name: string; model: string | null; year: number | null }, ctx: AiCtx): Promise<IntervalProposal> {
   const providers = researchProviders();
-  if (!providers.length) throw new Error("Tính năng tra cứu cần GEMINI_API_KEY hoặc ANTHROPIC_API_KEY (DeepSeek không tìm được web). Hoặc dùng cách quét bảng trong sổ hướng dẫn.");
-  const desc = [vehicle.model || vehicle.name, vehicle.year ? `đời ${vehicle.year}` : ""].filter(Boolean).join(" ");
+  if (!providers.length) throw new Error(ctx.t("ai.research_needs_key"));
+  const desc = [vehicle.model || vehicle.name, vehicle.year ? `(${vehicle.year})` : ""].filter(Boolean).join(" ");
   const parts = await trackedParts();
-  const prompt = researchPrompt(desc, parts);
+  const prompt = researchPrompt(desc, parts, ctx);
   const errors: string[] = [];
   for (const provider of providers) {
     try {
-      const { text, sources } = await (provider === "claude" ? searchClaude : searchGemini)(prompt);
+      const { text, sources } = await (provider === "claude" ? searchClaude(prompt) : searchGemini(prompt, shape(ctx)));
       const p = normalizeProposal(parseJson(text), new Set(parts.map((x) => x.id)), { vehicle_id: vehicle.id, origin: "ai", provider, sources });
-      if (!p.items.length) throw new Error("không tìm được chu kỳ có nguồn rõ ràng cho xe này");
+      if (!p.items.length) throw new Error(ctx.t("ai.no_sourced"));
       return p;
     } catch (e) {
       errors.push(`${provider}: ${e instanceof Error ? e.message : e}`);
@@ -113,22 +114,22 @@ export async function researchIntervals(vehicle: { id: number; name: string; mod
 }
 
 /** Đọc bảng bảo dưỡng chụp từ sổ hướng dẫn / sổ bảo hành của xe. */
-export async function extractIntervalsFromDoc(vehicle: { id: number }, file: Buffer, mime: string): Promise<IntervalProposal> {
+export async function extractIntervalsFromDoc(vehicle: { id: number }, file: Buffer, mime: string, ctx: AiCtx): Promise<IntervalProposal> {
   const order = providerOrder();
-  if (!order.length) throw new Error("Chưa cấu hình khóa AI trong .env");
+  if (!order.length) throw new Error(ctx.t("ai.no_key"));
   const parts = await trackedParts();
   const prompt =
-    `Đây là ảnh/PDF trang BẢNG CHU KỲ bảo dưỡng trong sổ hướng dẫn / sổ bảo hành của một chiếc ô tô. ` +
-    `Hãy đọc bảng và quy đổi thành chu kỳ cho từng linh kiện (km giữa 2 lần thay/kiểm tra và/hoặc số tháng). ` +
-    `Nếu bảng đánh dấu theo các mốc (10.000, 20.000, ... km) thì chu kỳ là khoảng cách giữa các mốc có dấu. ` +
-    `Chỉ điền linh kiện có trong bảng; không đoán. "confidence" = "high" khi đọc rõ, "low" khi chữ mờ/không chắc. "source_url" = null.\n\n` +
-    `Danh sách linh kiện (id: tên):\n${parts.map((p) => `${p.id}: ${p.name}`).join("\n")}`;
+    `This is a photo/PDF of the MAINTENANCE INTERVAL TABLE from a car's owner's manual / service book (any language). ` +
+    `Read the table and convert it into an interval per part (distance between replacements/inspections in ${ctx.unit}, and/or months). ` +
+    `If the table marks milestones (10,000, 20,000, ... ) the interval is the distance between marked milestones. ` +
+    `Only fill in parts that appear in the table; never guess. "confidence" = "high" when clearly legible, "low" when blurry/unsure. "source_url" = null.\n\n` +
+    `Parts (id: name):\n${parts.map((p) => `${p.id}: ${p.name}`).join("\n")}`;
   const errors: string[] = [];
   for (const provider of order) {
     try {
-      const raw = await visionJson(provider, file, mime, prompt, SHAPE);
+      const raw = await visionJson(provider, file, mime, prompt, shape(ctx));
       const p = normalizeProposal(raw, new Set(parts.map((x) => x.id)), { vehicle_id: vehicle.id, origin: "doc", provider, sources: [] });
-      if (!p.items.length) throw new Error("không đọc được chu kỳ nào từ trang này");
+      if (!p.items.length) throw new Error(ctx.t("ai.no_table"));
       return p;
     } catch (e) {
       errors.push(`${provider}: ${e instanceof Error ? e.message : e}`);

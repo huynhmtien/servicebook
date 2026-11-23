@@ -14,7 +14,6 @@
     "release": "node scripts/deploy.mjs",
     "db:migrate": "node scripts/deploy.mjs migrate",
     "db:migrate:local": "wrangler d1 migrations apply servicebook --local",
-    "gen:seed": "node --experimental-strip-types --no-warnings scripts/gen-seed.ts",
     "e2e": "node e2e/run.mjs"
   },
   "engines": {

@@ -51,3 +51,19 @@ test("độ tin cậy được kẹp trong 0..1", () => {
   assert.equal(d.items[0].confidence, 1);
   assert.equal(d.items[0].how, "ai");
 });
+
+test("normalizeDraft: số tiền thập phân → đơn vị nhỏ nhất (USD 2 chữ số)", () => {
+  const d = normalizeDraft({ garage: "Joe's", date: "2026-03-04", odo: 41000, discount: 5, vat: "7.25", vat_rate: 7, vat_included: false, slip_total: 122.5,
+    items: [{ raw_name: "Oil change", qty: 1, amount: 89.99, kind: "part", part_type_id: 2, confidence: 0.9 }] }, new Set([2]), 2);
+  assert.equal(d.items[0].amount, 8999);
+  assert.equal(d.discount, 500);
+  assert.equal(d.vat, 725);
+  assert.equal(d.slip_total, 12250);
+  assert.equal(d.odo, 41000);
+});
+
+test("normalizeDraft: VND (0 chữ số) giữ nguyên số nguyên", () => {
+  const d = normalizeDraft({ items: [{ raw_name: "Dầu", qty: 1, amount: 800000, kind: "part", part_type_id: 2, confidence: 1 }], slip_total: "1.263.600" }, new Set([2]), 0);
+  assert.equal(d.items[0].amount, 800000);
+  assert.equal(d.slip_total, 1263600);
+});

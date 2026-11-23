@@ -1,21 +1,24 @@
 "use client";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { sendDigestNow, testTelegram, type TgState } from "../actions";
+import { enableTelegramReplies, sendDigestNow, testTelegram, type TgState } from "../actions";
 import Icon from "./Icon";
+import { useI18n } from "./I18nProvider";
 
 function Btn({ children, disabled }: { children: React.ReactNode; disabled?: boolean }) {
   const { pending } = useFormStatus();
-  return <button type="submit" disabled={pending || disabled} aria-busy={pending}>{pending ? "Đang gửi…" : children}</button>;
+  const { t } = useI18n();
+  return <button type="submit" disabled={pending || disabled} aria-busy={pending}>{pending ? t("common.sending") : children}</button>;
 }
 
 function Result({ s }: { s: TgState }) {
+  const { t } = useI18n();
   if (!s.steps && !s.message) return null;
   return (
     <div className="card" role="status" style={{ marginTop: 12 }}>
       {s.steps?.map((st, i) => (
         <div key={i} className="row" style={{ alignItems: "flex-start", flexWrap: "nowrap", marginBottom: 6 }}>
-          <span className={`badge ${st.ok ? "b-ok" : "b-overdue"}`} style={{ flex: "none" }}><Icon n={st.ok ? "check" : "alert"} s={14} />{st.ok ? "OK" : "Lỗi"}</span>
+          <span className={`badge ${st.ok ? "b-ok" : "b-overdue"}`} style={{ flex: "none" }}><Icon n={st.ok ? "check" : "alert"} s={14} />{st.ok ? t("tg.ok") : t("tg.err")}</span>
           <span>{st.text}</span>
         </div>
       ))}
@@ -25,16 +28,21 @@ function Result({ s }: { s: TgState }) {
 }
 
 export default function TelegramPanel() {
-  const [t, testAction] = useActionState<TgState, FormData>(testTelegram, {});
+  const { t } = useI18n();
+  const [tr, testAction] = useActionState<TgState, FormData>(testTelegram, {});
   const [d, digestAction] = useActionState<TgState, FormData>(sendDigestNow, {});
+  const [w, webhookAction] = useActionState<TgState, FormData>(enableTelegramReplies, {});
   return (
     <>
       <div className="row">
-        <form action={testAction}><Btn>Kiểm tra &amp; gửi tin thử</Btn></form>
-        <form action={digestAction}><Btn>Gửi tổng hợp cảnh báo ngay</Btn></form>
+        <form action={testAction}><Btn>{t("tg.test")}</Btn></form>
+        <form action={digestAction}><Btn>{t("tg.digest")}</Btn></form>
+        <form action={webhookAction}><Btn>{t("tg.webhook_enable")}</Btn></form>
       </div>
-      <Result s={t} />
+      <p className="mute" style={{ margin: "8px 0 0" }}>{t("tg.webhook_hint")}</p>
+      <Result s={tr} />
       <Result s={d} />
+      <Result s={w} />
     </>
   );
 }

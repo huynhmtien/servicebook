@@ -1,3 +1,6 @@
+import { getI18n } from "./settings.ts";
+import type { T } from "./i18n/index.ts";
+
 /** Giá trị dán vào biến môi trường hay dính khoảng trắng / xuống dòng / dấu ngoặc kép → làm sạch. */
 const clean = (v?: string) => (v ?? "").trim().replace(/^["']|["']$/g, "").trim();
 const token = () => clean(process.env.TELEGRAM_BOT_TOKEN);
@@ -23,45 +26,51 @@ async function call(method: string, body?: unknown): Promise<TgResult> {
   }
 }
 
-/** Dịch lỗi Telegram sang lời khuyên cụ thể. */
-export function hint(status: number, description = "", stage: "token" | "send"): string {
+/** Dịch lỗi Telegram sang lời khuyên cụ thể (theo ngôn ngữ đang dùng). */
+export function hint(t: T, status: number, description = "", stage: "token" | "send"): string {
   const d = description.toLowerCase();
-  if (status === 0) return `Máy chủ không kết nối được tới Telegram (${description}). Thử lại sau ít phút.`;
-  if (status === 401 || (stage === "token" && status === 404))
-    return "Token bot sai hoặc đã bị thu hồi. Lấy lại token: Telegram → @BotFather → /mybots → chọn bot → API Token, rồi dán lại vào TELEGRAM_BOT_TOKEN (không có khoảng trắng) và Redeploy.";
-  if (d.includes("chat not found") || d.includes("chat_id is empty"))
-    return "Chat ID sai, hoặc anh chưa bấm Start với bot. Mở bot trong Telegram, bấm Start (hoặc nhắn 'hi'), rồi lấy số Id từ @userinfobot và dán vào TELEGRAM_CHAT_ID.";
-  if (d.includes("bots can't send messages to bots"))
-    return "Chat ID đang là Id của một bot. Dùng Id của tài khoản cá nhân anh (lấy từ @userinfobot).";
-  if (status === 403) return "Bot chưa được phép nhắn cho anh (chưa Start hoặc đã bị chặn). Mở bot trong Telegram, bỏ chặn và bấm Start.";
-  if (status === 429) return "Telegram đang giới hạn tốc độ, đợi một lúc rồi thử lại.";
-  return `Telegram trả lỗi ${status}: ${description || "không rõ"}`;
+  if (status === 0) return t("tg.hint_network", { detail: description });
+  if (status === 401 || (stage === "token" && status === 404)) return t("tg.hint_token");
+  if (d.includes("chat not found") || d.includes("chat_id is empty")) return t("tg.hint_chat");
+  if (d.includes("bots can't send messages to bots")) return t("tg.hint_bot_id");
+  if (status === 403) return t("tg.hint_forbidden");
+  if (status === 429) return t("tg.hint_rate");
+  return t("tg.hint_generic", { status, detail: description || t("tg.unknown") });
+}
+
+/** Đăng ký webhook để bot nhận tin trả lời (cập nhật ODO bằng tin nhắn). */
+export async function setTelegramWebhook(url: string, secret: string): Promise<{ ok: boolean; error?: string }> {
+  const { t } = await getI18n();
+  const r = await call("setWebhook", { url, secret_token: secret, allowed_updates: ["message"], drop_pending_updates: true });
+  return r.ok ? { ok: true } : { ok: false, error: hint(t, r.status, r.description, "token") };
 }
 
 export async function sendTelegram(text: string): Promise<{ ok: boolean; error?: string }> {
-  if (!telegramConfigured()) return { ok: false, error: "Chưa cấu hình TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID" };
+  const { t } = await getI18n();
+  if (!telegramConfigured()) return { ok: false, error: t("tg.err_no_conf") };
   const r = await call("sendMessage", { chat_id: chat(), text, parse_mode: "HTML", disable_web_page_preview: true });
-  return r.ok ? { ok: true } : { ok: false, error: hint(r.status, r.description, "send") };
+  return r.ok ? { ok: true } : { ok: false, error: hint(t, r.status, r.description, "send") };
 }
 
 export interface Step { ok: boolean; text: string }
 
 /** Kiểm tra từng bước để biết chính xác hỏng ở đâu. */
 export async function telegramDiagnose(): Promise<{ ok: boolean; steps: Step[] }> {
+  const { t } = await getI18n();
   const steps: Step[] = [];
-  const t = token(), c = chat();
+  const tk = token(), c = chat();
   const fin = (ok: boolean) => ({ ok, steps });
-  if (!t) { steps.push({ ok: false, text: "Chưa có TELEGRAM_BOT_TOKEN trong cấu hình (nhớ Redeploy sau khi thêm biến)." }); return fin(false); }
-  if (!c) { steps.push({ ok: false, text: "Chưa có TELEGRAM_CHAT_ID trong cấu hình (nhớ Redeploy sau khi thêm biến)." }); return fin(false); }
-  const tokenOk = /^\d+:[\w-]{20,}$/.test(t);
-  steps.push({ ok: tokenOk, text: tokenOk ? "Token đúng định dạng" : "Token sai định dạng (phải dạng 123456789:AAH…, không có khoảng trắng/ký tự lạ)" });
+  if (!tk) { steps.push({ ok: false, text: t("tg.step_no_token") }); return fin(false); }
+  if (!c) { steps.push({ ok: false, text: t("tg.step_no_chat") }); return fin(false); }
+  const tokenOk = /^\d+:[\w-]{20,}$/.test(tk);
+  steps.push({ ok: tokenOk, text: t(tokenOk ? "tg.step_token_fmt_ok" : "tg.step_token_fmt_bad") });
   const chatOk = /^-?\d+$/.test(c) || /^@\w+$/.test(c);
-  steps.push({ ok: chatOk, text: chatOk ? "Chat ID đúng định dạng" : "Chat ID sai định dạng (phải là một dãy số, lấy từ @userinfobot)" });
+  steps.push({ ok: chatOk, text: t(chatOk ? "tg.step_chat_fmt_ok" : "tg.step_chat_fmt_bad") });
   const me = await call("getMe");
-  if (!me.ok) { steps.push({ ok: false, text: hint(me.status, me.description, "token") }); return fin(false); }
-  steps.push({ ok: true, text: `Bot hợp lệ${me.result?.username ? `: @${me.result.username}` : ""}` });
-  const sent = await sendTelegram("✅ ServiceBook: kết nối Telegram hoạt động.");
-  steps.push({ ok: sent.ok, text: sent.ok ? "Đã gửi tin thử — kiểm tra Telegram của anh" : sent.error! });
+  if (!me.ok) { steps.push({ ok: false, text: hint(t, me.status, me.description, "token") }); return fin(false); }
+  steps.push({ ok: true, text: t("tg.step_bot_ok", { name: me.result?.username ? `: @${me.result.username}` : "" }) });
+  const sent = await sendTelegram(t("tg.test_msg"));
+  steps.push({ ok: sent.ok, text: sent.ok ? t("tg.step_sent_ok") : sent.error! });
   return fin(sent.ok);
 }
 

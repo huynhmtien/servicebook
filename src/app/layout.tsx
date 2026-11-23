@@ -1,10 +1,13 @@
 import "./globals.css";
 import type { ReactNode } from "react";
 import { TabBar } from "./components/Nav";
+import { I18nProvider } from "./components/I18nProvider";
+import { LANGS } from "../lib/i18n/index.ts";
+import { getI18n } from "../lib/settings.ts";
 
+// Metadata tĩnh (không truy vấn DB): generateMetadata bất đồng bộ làm Next stream metadata và gây lỗi hydrate (React #418).
+// Tiêu đề/mô tả theo ngôn ngữ được render bằng thẻ <title>/<meta> gốc ở layout bên dưới (React 19 tự đưa vào <head>).
 export const metadata = {
-  title: "ServiceBook — Sổ bảo dưỡng xe",
-  description: "Quản lý bảo dưỡng ô tô: nhắc lịch, tuổi thọ linh kiện, chi phí",
   applicationName: "ServiceBook",
   appleWebApp: { capable: true, title: "ServiceBook", statusBarStyle: "default" as const },
   icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
@@ -21,14 +24,21 @@ export const viewport = {
 };
 export const dynamic = "force-dynamic";
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const { lang, fmt, t } = await getI18n();
   return (
-    <html lang="vi">
+    <html lang={lang}>
+      <head>
+        <title>{`${t("app.name")} — ${t("app.tagline")}`}</title>
+        <meta name="description" content={t("app.description")} />
+      </head>
       <body>
-        <div className="app">
-          <main>{children}</main>
-          <TabBar />
-        </div>
+        <I18nProvider lang={lang} messages={LANGS[lang].dict} fmtOptions={{ locale: fmt.locale, currency: fmt.currency, distance: fmt.unit, taxLabel: fmt.taxLabel }}>
+          <div className="app">
+            <main>{children}</main>
+            <TabBar />
+          </div>
+        </I18nProvider>
       </body>
     </html>
   );
