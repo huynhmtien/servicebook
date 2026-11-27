@@ -18,6 +18,7 @@ import { restoreBackup } from "../lib/backup.ts";
 import { KEY_FIELDS, validateKey } from "../lib/secret-crypto.ts";
 import { canStoreKeys, deleteSecret, loadSecrets, setSecret } from "../lib/secrets.ts";
 import { INITIAL_NOTE, normName, today } from "../lib/util.ts";
+import { CATEGORIES, COST_ONLY, keywordsFor } from "../lib/parts.ts";
 import { FUELS, TRANSMISSIONS, oneOf, specDesc } from "../lib/vehicle-spec.ts";
 import { describeDefect, extractVehicle, SEVERITIES } from "../lib/vehicle-ai.ts";
 
@@ -55,7 +56,7 @@ export async function addVehicle(f: FormData) {
     year: n(f, "year"), odo: n(f, "odo") ?? 0, fuel: oneOf(FUELS, s(f, "fuel")),
     transmission: oneOf(TRANSMISSIONS, s(f, "transmission")), engine: s(f, "engine") || null, vin: s(f, "vin") || null,
   }, { distance: settings.distance });
-  done(`/vehicles/${id}/setup`, t("act.vehicle_added"));
+  done(`/vehicles/${id}`, t("act.vehicle_added"));
 }
 
 export async function deleteVehicle(f: FormData) {
@@ -286,7 +287,8 @@ export async function scanSlip(f: FormData) {
   if (!supportedMime(mime)) err(t("act.bad_mime"));
   let id: number;
   try {
-    const draft = await extractSlip(buf, mime, aiContext(i18n)); // the image is only sent to the AI to read, not stored
+    const veh = await getVehicle(vid);
+    const draft = await extractSlip(buf, mime, aiContext(i18n), veh ? specDesc(veh) : undefined); // the image is only sent to the AI to read, not stored
     id = await insert("INSERT INTO drafts (vehicle_id, data) VALUES (?,?)", vid, JSON.stringify(draft));
   } catch (e) {
     console.error("[servicebook] scan failed:", e);
@@ -514,4 +516,28 @@ export async function deleteDefect(f: FormData) {
   await run("DELETE FROM defects WHERE id = ?", Number(f.get("id")));
   revalidatePath("/", "layout");
   done("/defects", t("defects.deleted"));
+}
+
+
+// ---------- custom parts: the catalog is not fixed ----------
+export interface NewPart { id: number; name: string; category: string; kw: string[] }
+/**
+ * Add a part to the catalog (called from the record form). It is tracked on every vehicle straight away; the interval is optional
+ * (leave empty and set it later from the manual or the AI lookup). A part with the same name is reused instead of duplicated.
+ */
+export async function createPart(input: { name: string; category: string; km?: number | null; months?: number | null }): Promise<NewPart | { error: string }> {
+  const name = String(input.name ?? "").replace(/\s+/g, " ").trim().slice(0, 60);
+  const category = String(input.category ?? "");
+  if (name.length < 2) return { error: "name" };
+  if (!(CATEGORIES as readonly string[]).includes(category)) return { error: "category" };
+  const existing = (await all<{ id: number; name: string; category: string }>("SELECT id, name, category FROM part_types")).find((p) => normName(p.name) === normName(name));
+  const mk = (id: number, nm: string, cat: string): NewPart => ({ id, name: nm, category: cat, kw: keywordsFor(nm) });
+  if (existing) return mk(existing.id, existing.name, existing.category);
+  const num = (v: unknown) => { const x = Math.round(Number(v)); return Number.isFinite(x) && x > 0 ? x : null; };
+  const km = category === COST_ONLY ? null : num(input.km), months = category === COST_ONLY ? null : num(input.months);
+  const id = await insert("INSERT INTO part_types (name, category, default_km, default_months) VALUES (?,?,?,?)", name, category, km, months);
+  if (category !== COST_ONLY)
+    await run("INSERT INTO rules (vehicle_id, part_type_id, interval_km, interval_months, enabled) SELECT id, ?, ?, ?, 1 FROM vehicles", id, km, months);
+  revalidatePath("/", "layout");
+  return mk(id, name, category);
 }

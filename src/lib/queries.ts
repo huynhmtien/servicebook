@@ -3,6 +3,7 @@ import { evaluateRule, avgKmPerDay, type RuleResult } from "./rules.ts";
 import { today } from "./util.ts";
 import { COST_ONLY, categoryRank, keywordsFor } from "./parts.ts";
 import type { DistanceUnit } from "./format.ts";
+import { notApplicable } from "./vehicle-spec.ts";
 
 export interface Vehicle {
   id: number; name: string; plate: string | null; model: string | null; year: number | null; odo: number; fuel: string | null;
@@ -26,12 +27,6 @@ export const listPartTypes = async (): Promise<PartTypeKw[]> =>
     .sort((a, b) => categoryRank(a.category) - categoryRank(b.category) || a.id - b.id)
     .map((p) => ({ ...p, kw: keywordsFor(p.name) }));
 
-/** Parts that don't apply to each fuel type (tracking is auto-disabled when creating a vehicle; can be re-enabled on the vehicle page). */
-const NOT_APPLICABLE: Record<string, string[]> = {
-  diesel: ["spark_plugs"],
-  electric: ["engine_oil", "oil_filter", "air_filter", "fuel_filter", "spark_plugs", "drive_belt", "injector_cleaning"],
-};
-
 export async function createVehicle(v: Omit<Vehicle, "id">, opts: { distance: DistanceUnit } = { distance: "km" }): Promise<number> {
   const id = await insert(
     "INSERT INTO vehicles (name, plate, model, year, odo, fuel, transmission, engine, vin) VALUES (?,?,?,?,?,?,?,?,?)",
@@ -39,7 +34,7 @@ export async function createVehicle(v: Omit<Vehicle, "id">, opts: { distance: Di
   );
   // default intervals are in km; if using miles, convert and round to 500
   const km = opts.distance === "mi" ? "CAST(ROUND(default_km * 0.621371 / 500.0) * 500 AS INTEGER)" : "default_km";
-  const off = NOT_APPLICABLE[v.fuel ?? ""] ?? [];
+  const off = notApplicable(v.fuel, v.transmission);
   await batch([
     [`INSERT INTO rules (vehicle_id, part_type_id, interval_km, interval_months, enabled)
       SELECT ?, id, ${km}, default_months, CASE WHEN key IN (${off.map(() => "?").join(",") || "NULL"}) THEN 0 ELSE 1 END

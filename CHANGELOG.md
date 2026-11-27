@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.1 — 2026-11-28
+- **The parts catalog is no longer fixed.** Added the parts that were missing for manual / diesel cars (clutch, flywheel, timing belt/chain, water pump, glow plugs, drive shafts / CV joints, power-steering fluid, wheel bearings, radiator & hoses, alternator/starter; migration `0008`). On a slip line that fits nothing you can now choose *＋ Add a part that's not in the list…* (name, group, optional interval; tracked on every vehicle at once), and the AI proposes a new part ("AI suggests adding “Clutch kit” — tap to add") instead of dumping the line into *Other*. The vehicle's fuel/gearbox are sent to the slip reader; manual cars no longer track ATF, automatics no longer track the clutch.
+- **No more "initial replacement" step.** Past service slips are the history: the due date of every part is computed from the latest slip that contains it (date and ODO). Dashboard checklist, vehicle page and the post-"add vehicle" redirect now point to adding slips.
+- **Lighter pages**: the browser no longer receives the full translation dictionaries or the keyword catalog (only the key groups client components use).
+- Fix: duplicate list keys right after creating a part from the slip form.
+
 ## 1.5.0 — 2026-11-28
 - **Vehicle health on the dashboard**: a 0–100 score (ring + level) built from overdue / due-soon parts and open issues, per-part progress bars, quick actions, and a compact setup checklist. The whole UI was restyled (dark hero card, raised capture button, tighter vehicle page that hides parts with no data), light and dark, axe-clean.
 - **Exact vehicle variant**: new Gearbox, Engine and VIN fields; the web lookup of service intervals now sends make + model + year + fuel + gearbox + engine (diesel vs petrol and manual vs automatic differ). "Toyota" + "Fortuner" in separate fields are merged.

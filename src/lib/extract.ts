@@ -1,6 +1,6 @@
 import { all, get } from "./db.ts";
 import { normName } from "./util.ts";
-import { GENERIC_KEY, guessPart, keywordsFor } from "./parts.ts";
+import { CATEGORIES, GENERIC_KEY, COST_ONLY, guessPart, keywordsFor } from "./parts.ts";
 import { inferVat } from "./money.ts";
 import { parseAmount } from "./format.ts";
 import { LANGS, type Lang, type T } from "./i18n/index.ts";
@@ -20,6 +20,8 @@ export interface DraftItem {
   /** classification source: confirmed memory / AI / automatic keyword / none */
   how?: "memory" | "ai" | "keyword" | null;
   confidence?: number | null;
+  /** AI proposal to create a new catalog part when none of the standard parts fits (e.g. "Clutch disc") */
+  new_part?: { name: string; category: string } | null;
 }
 export interface Draft {
   garage: string; date: string | null; odo: number | null; slip_total: number | null;
@@ -52,12 +54,14 @@ const SHAPE = `{
   "vat_included": boolean (true if the slip says line prices ALREADY INCLUDE tax),
   "slip_total": number|null (final total paid on the slip),
   "items": [ { "raw_name": string (exactly as printed), "qty": number, "amount": number (line total),
-               "kind": "part"|"labor", "part_type_id": integer, "confidence": number (0 to 1) } ]
+               "kind": "part"|"labor", "part_type_id": integer|null, "confidence": number (0 to 1),
+               "new_part": {"name": string, "category": string}|null } ]
 }`;
 
-function buildPrompt(parts: { id: number; name: string; category: string }[], c: AiCtx): string {
+function buildPrompt(parts: { id: number; name: string; category: string }[], c: AiCtx, vehicle?: string): string {
+  const cats = CATEGORIES.filter((x) => x !== COST_ONLY).join(", ");
   return (
-    `This is a vehicle maintenance / repair invoice. It may be written in any language. Extract every line item (both parts and labor). ` +
+    `This is a vehicle maintenance / repair invoice${vehicle ? ` for this vehicle: ${vehicle}` : ""}. It may be written in any language. Extract every line item (both parts and labor). ` +
     `Money: amounts are in ${c.currency} unless the slip clearly shows another currency; write plain numbers with "." as the decimal separator and no thousands separators (e.g. 1234.5). ` +
     `Dates: output YYYY-MM-DD; if a date is ambiguous (e.g. 03/04/2026) use the convention of locale ${c.locale}. ` +
     `Odometer: report in ${c.unit}; convert if the slip uses another unit.\n\n` +
@@ -67,6 +71,8 @@ function buildPrompt(parts: { id: number; name: string; category: string }[], c:
     `CLASSIFICATION: every line must get one "part_type_id" from the list above. A part/service line that matches a component gets that component; ` +
     `a labor line for replacing/repairing a component gets the same id as that component with kind = "labor"; general labor gets the "General labor" id; ` +
     `anything else gets "Other (uncategorized)". "confidence" is how sure you are about the classification (0–1). ` +
+    `NEW PART: if a line is clearly a real vehicle component or service (not a fee, tax, consumable or general labor) that NONE of the standard parts fits ` +
+    `(for example "clutch disc" when only gearbox oil exists), set "part_type_id" to null and fill "new_part" with {"name": a short generic name in ${c.languageName}, "category": one of: ${cats}}; otherwise "new_part" is null. ` +
     `Keep "raw_name" in the original language of the slip. Do not invent data: leave a field null / 0 / "" when it is not on the slip.`
   );
 }
@@ -90,6 +96,7 @@ const JSON_SCHEMA = {
           raw_name: { type: "string" }, qty: { type: "number" }, amount: { type: "number" },
           kind: { type: "string", enum: ["part", "labor"] }, part_type_id: { type: ["integer", "null"] },
           confidence: { type: "number" },
+          new_part: { type: ["object", "null"], properties: { name: { type: "string" }, category: { type: "string", enum: [...CATEGORIES] } }, required: ["name", "category"] },
         },
         required: ["raw_name", "qty", "amount", "kind", "part_type_id", "confidence"],
       },
@@ -231,6 +238,14 @@ const toRate = (v: unknown): number | null => {
   return Number.isFinite(n) && n > 0 && n <= 30 ? n : null;
 };
 
+/** A proposed new catalog part: needs a sane name and a known (non-cost) category. */
+export function normalizeNewPart(v: unknown): { name: string; category: string } | null {
+  const o = (v && typeof v === "object" ? v : null) as { name?: unknown; category?: unknown } | null;
+  const name = String(o?.name ?? "").replace(/\s+/g, " ").trim().slice(0, 60);
+  const cat = String(o?.category ?? "");
+  return name.length >= 2 && (CATEGORIES as readonly string[]).includes(cat) && cat !== COST_ONLY ? { name, category: cat } : null;
+}
+
 /** Coerce raw AI data to the right types and drop empty rows; every model goes through this step. */
 export function normalizeDraft(raw: unknown, validParts: Set<number>, digits = 0): Draft {
   const r = (raw ?? {}) as Record<string, unknown>;
@@ -248,6 +263,7 @@ export function normalizeDraft(raw: unknown, validParts: Set<number>, digits = 0
         kind: x.kind === "labor" ? "labor" : "part",
         part_type_id: ok ? pid : null,
         how: ok ? "ai" : null,
+        new_part: ok ? null : normalizeNewPart(x.new_part),
         confidence: Number.isFinite(conf) ? Math.max(0, Math.min(1, conf)) : null,
       } as DraftItem;
     })
@@ -294,11 +310,11 @@ export async function visionJson(provider: Provider, file: Buffer, mime: string,
 
 const RUN = { claude: viaClaude, gemini: viaGemini, deepseek: viaDeepseek } as const;
 
-export async function extractSlip(file: Buffer, mime: string, ctx: AiCtx): Promise<Draft & { provider: Provider }> {
+export async function extractSlip(file: Buffer, mime: string, ctx: AiCtx, vehicle?: string): Promise<Draft & { provider: Provider }> {
   const order = providerOrder();
   if (!order.length) throw new Error(ctx.t("ai.no_key"));
   const parts = await all<{ id: number; key: string | null; name: string; category: string }>("SELECT id, key, name, category FROM part_types ORDER BY id");
-  const prompt = buildPrompt(parts, ctx);
+  const prompt = buildPrompt(parts, ctx, vehicle);
   const errors: string[] = [];
   for (const provider of order) {
     try {

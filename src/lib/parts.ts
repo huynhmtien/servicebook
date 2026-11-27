@@ -1,14 +1,7 @@
 import { normName } from "./util.ts";
-
-/** Part categories (stable key, stored in the DB; display name in i18n: `cat.<key>`). */
-export const CATEGORIES = ["periodic", "engine", "cooling", "ac", "drivetrain", "brakes", "chassis", "electrical", "documents", "other_costs"] as const;
-export type Category = (typeof CATEGORIES)[number];
-
-/** Categories without due tracking (only for cost classification). */
-export const COST_ONLY: Category = "other_costs";
-/** Keys of two special entries: general labor and "uncategorized". */
-export const LABOR_KEY = "labor";
-export const GENERIC_KEY = "other";
+import { CATEGORIES, COST_ONLY, LABOR_KEY, GENERIC_KEY, guessPart, type Category } from "./parts-core.ts";
+export { CATEGORIES, COST_ONLY, LABOR_KEY, GENERIC_KEY, guessPart };
+export type { Category };
 
 export type Lang = "en" | "vi";
 export interface DefaultPart {
@@ -45,7 +38,7 @@ export const DEFAULT_PARTS: DefaultPart[] = [
     kw: { en: ["spark plug", "spark plugs", "plugs", "ignition plug"], vi: ["bugi", "buji", "bu gi", "spark plug"] } },
   { key: "drive_belt", category: "engine", km: 80000, months: 60,
     names: { en: "Drive belt", vi: "Dây curoa" },
-    kw: { en: ["drive belt", "serpentine belt", "fan belt", "timing belt", "belt"], vi: ["day curoa", "curoa", "day dai", "drive belt", "day cu roa"] } },
+    kw: { en: ["drive belt", "serpentine belt", "fan belt", "belt"], vi: ["day curoa", "curoa", "day dai", "drive belt", "day cu roa"] } },
   { key: "coolant", category: "cooling", km: 40000, months: 24,
     names: { en: "Coolant", vi: "Nước làm mát" },
     kw: { en: ["coolant", "antifreeze", "radiator fluid", "radiator coolant"], vi: ["nuoc lam mat", "nuoc giai nhiet", "coolant", "dung dich lam mat", "nuoc mat"] } },
@@ -106,6 +99,36 @@ export const DEFAULT_PARTS: DefaultPart[] = [
   { key: "suspension_bushings", category: "chassis", km: null, months: null,
     names: { en: "Ball joints / suspension bushings", vi: "Rotuyn / cao su gầm" },
     kw: { en: ["ball joint", "ball joints", "bushing", "bushings", "control arm", "tie rod", "tie rod end", "stabilizer link", "engine mount", "suspension arm"], vi: ["rotuyn", "rotul", "cao su can bang", "cao su chong rung", "bac lot", "cao su cang a", "cao su chan may", "chan may", "cao su gam", "cang a", "bi tren", "bi lap", "rotuyn lai", "co rotuyn"] } },
+  { key: "timing_belt", category: "engine", km: null, months: null,
+    names: { en: "Timing belt / chain", vi: "Dây cam / xích cam" },
+    kw: { en: ["timing belt", "timing chain", "cam belt", "belt tensioner", "chain tensioner"], vi: ["day cam", "xich cam", "day curoa cam", "cang day cam", "cang xich cam", "bi cang cam", "bo day cam"] } },
+  { key: "water_pump", category: "engine", km: null, months: null,
+    names: { en: "Water pump", vi: "Bơm nước" },
+    kw: { en: ["water pump", "coolant pump"], vi: ["bom nuoc", "bom nuoc lam mat", "bom nuoc dong co"] } },
+  { key: "glow_plugs", category: "engine", km: null, months: null,
+    names: { en: "Glow plugs (diesel)", vi: "Bugi sấy (máy dầu)" },
+    kw: { en: ["glow plug", "glow plugs"], vi: ["bugi say", "buji say", "bu gi say", "bugi xong", "bugi dot nong"] } },
+  { key: "clutch", category: "drivetrain", km: null, months: null,
+    names: { en: "Clutch (disc / pressure plate / release bearing)", vi: "Ly hợp (mâm, bàn ép, bi tê)" },
+    kw: { en: ["clutch", "clutch kit", "clutch disc", "clutch plate", "clutch cover", "pressure plate", "release bearing", "throw out bearing", "clutch master", "clutch slave"], vi: ["ly hop", "mam ly hop", "bo ly hop", "la con", "bo con", "mam ep", "ban ep", "bi te", "bi tai", "bac dan te", "long ly hop", "cum ly hop", "bom ly hop", "xi lanh ly hop", "mam ly hop amaza", "la ly hop"] } },
+  { key: "flywheel", category: "drivetrain", km: null, months: null,
+    names: { en: "Flywheel", vi: "Bánh đà" },
+    kw: { en: ["flywheel", "dual mass flywheel", "dmf"], vi: ["banh da", "banh da khoi luong kep", "mam banh da"] } },
+  { key: "drive_shafts", category: "drivetrain", km: null, months: null,
+    names: { en: "Drive shafts / CV joints & boots", vi: "Láp / khớp các đăng & cao su láp" },
+    kw: { en: ["cv joint", "cv boot", "cv axle", "drive shaft", "driveshaft", "axle shaft", "propeller shaft", "u joint"], vi: ["lap truyen dong", "cao su lap", "cac dang", "khop cac dang", "cardan", "khop dang", "lap xe", "bi lap"] } },
+  { key: "power_steering_fluid", category: "chassis", km: null, months: null,
+    names: { en: "Power steering fluid", vi: "Dầu trợ lực lái" },
+    kw: { en: ["power steering fluid", "steering fluid", "ps fluid"], vi: ["dau tro luc lai", "dau tro luc", "dau lai", "dau power steering"] } },
+  { key: "wheel_bearings", category: "chassis", km: null, months: null,
+    names: { en: "Wheel bearings", vi: "Bạc đạn / vòng bi bánh xe" },
+    kw: { en: ["wheel bearing", "wheel bearings", "hub bearing", "hub assembly"], vi: ["bac dan banh", "vong bi banh", "bi banh xe", "bac dan moay o", "moay o", "bi moay o"] } },
+  { key: "radiator_hoses", category: "cooling", km: null, months: null,
+    names: { en: "Radiator / coolant hoses", vi: "Két nước / ống nước" },
+    kw: { en: ["radiator", "radiator hose", "coolant hose", "thermostat"], vi: ["ket nuoc", "ong nuoc", "ong dan nuoc", "la tan nhiet", "van hang nhiet", "nap ket nuoc"] } },
+  { key: "alternator_starter", category: "electrical", km: null, months: null,
+    names: { en: "Alternator / starter", vi: "Máy phát / củ đề" },
+    kw: { en: ["alternator", "starter motor", "starter", "generator"], vi: ["may phat", "cu de", "may de", "dinamo", "dynamo", "may phat dien"] } },
   { key: "labor", category: COST_ONLY, km: null, months: null,
     names: { en: "General labor", vi: "Nhân công / công thợ chung" },
     kw: { en: ["labor", "labour", "labor charge", "workmanship", "service charge", "inspection labor", "labour charge"], vi: ["cong kiem tra", "cong tho", "nhan cong", "tien cong", "cong lap", "cong thay", "cong ve sinh", "cong"] } },
@@ -126,20 +149,11 @@ export const DEFAULT_PARTS: DefaultPart[] = [
 const BY_KEY = new Map(DEFAULT_PARTS.map((p) => [p.key, p]));
 const KW_BY_NAME = new Map(DEFAULT_PARTS.map((p) => [p.names.en, [...p.kw.en, ...p.kw.vi].map(normName)]));
 /** Keywords (both languages) of a part, by the name stored in the DB. */
-export const keywordsFor = (dbName: string): string[] => KW_BY_NAME.get(dbName) ?? [];
+/** Custom parts (not in the standard catalog) match on their own name. */
+export const keywordsFor = (dbName: string): string[] => KW_BY_NAME.get(dbName) ?? [normName(dbName)].filter((k) => k.length >= 3);
 /** Display name of a part by language (custom-added parts use their stored name). */
 export const partLabel = (p: { key?: string | null; name: string }, lang: string): string =>
   (p.key && BY_KEY.get(p.key)?.names[lang as Lang]) || p.name;
 /** Category order for display. */
 export const categoryRank = (c: string): number => { const i = (CATEGORIES as readonly string[]).indexOf(c); return i < 0 ? 99 : i; };
 
-/** Guess the part from an item name (longest keyword match). Returns an id or null. */
-export function guessPart(raw: string, parts: { id: number; kw: string[] }[]): number | null {
-  const n = ` ${normName(raw)} `;
-  let best: { id: number; len: number } | null = null;
-  for (const p of parts)
-    for (const k of p.kw) {
-      if (k && n.includes(` ${k} `) && (!best || k.length > best.len)) best = { id: p.id, len: k.length };
-    }
-  return best?.id ?? null;
-}

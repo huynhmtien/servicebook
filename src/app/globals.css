@@ -257,3 +257,7 @@ th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute
 .form.cols2>.field.wide{grid-column:1/-1}
 @media(max-width:340px){.form.cols2{grid-template-columns:minmax(0,1fr)}}
 .capture{position:relative}
+
+/* inline "add a part to the catalog" panel inside a record line */
+.newpart{margin-top:10px;padding:14px;border-radius:var(--r-sm);background:var(--surface2);border:1.5px solid var(--line2);display:grid;gap:12px}
+.newpart .field input,.newpart .field select{width:100%}

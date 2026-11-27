@@ -3,6 +3,12 @@ import type { ReactNode } from "react";
 import { TabBar } from "./components/Nav";
 import { I18nProvider } from "./components/I18nProvider";
 import { LANGS } from "../lib/i18n/index.ts";
+import type { Messages } from "../lib/i18n/en.ts";
+
+/** Only the key groups that client components use are sent to the browser (keeps every page light). Add a prefix here when a client component starts using a new group. */
+const CLIENT_PREFIXES = ["login.", "scan.", "nav.", "defects.", "items.", "pay.", "cat.", "hint.", "common.", "tg."];
+const clientMessages = (d: Messages): Messages =>
+  Object.fromEntries(Object.entries(d).filter(([k]) => CLIENT_PREFIXES.some((p) => k.startsWith(p)))) as Messages;
 import { getI18n } from "../lib/settings.ts";
 
 // Static metadata (no DB query): async generateMetadata makes Next stream the metadata and causes a hydration error (React #418).
@@ -33,7 +39,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <meta name="description" content={t("app.description")} />
       </head>
       <body>
-        <I18nProvider lang={lang} messages={LANGS[lang].dict} fmtOptions={{ locale: fmt.locale, currency: fmt.currency, distance: fmt.unit, taxLabel: fmt.taxLabel }}>
+        <I18nProvider lang={lang} messages={clientMessages(LANGS[lang].dict)} fmtOptions={{ locale: fmt.locale, currency: fmt.currency, distance: fmt.unit, taxLabel: fmt.taxLabel }}>
           <a className="skip" href="#main">{t("a11y.skip")}</a>
           <div className="app">
             <main id="main" tabIndex={-1}>{children}</main>

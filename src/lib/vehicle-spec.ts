@@ -28,3 +28,17 @@ export const oneOf = <T extends string>(list: readonly T[], v: unknown): T | nul
   const s = String(v ?? "").trim().toLowerCase();
   return (list as readonly string[]).includes(s) ? (s as T) : null;
 };
+
+const ALL_NA: Record<string, string[]> = {
+  diesel: ["spark_plugs"],
+  petrol: ["glow_plugs"],
+  hybrid: ["glow_plugs"],
+  electric: ["engine_oil", "oil_filter", "air_filter", "fuel_filter", "spark_plugs", "glow_plugs", "drive_belt", "timing_belt", "water_pump", "injector_cleaning", "clutch", "flywheel", "atf", "gear_oil"],
+};
+/** Part keys that do not apply to this fuel / gearbox (tracking is switched off when the vehicle is created; can be re-enabled on the vehicle page). */
+export function notApplicable(fuel: string | null, transmission: string | null): string[] {
+  const out = new Set(ALL_NA[fuel ?? ""] ?? []);
+  if (transmission === "manual") out.add("atf");
+  if (transmission === "automatic" || transmission === "cvt" || transmission === "dct") { out.add("clutch"); out.add("flywheel"); }
+  return [...out];
+}

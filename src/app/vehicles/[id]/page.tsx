@@ -117,7 +117,6 @@ export default async function VehiclePage({ params, searchParams }: { params: Pr
 
       <div className="row" style={{ justifyContent: "space-between" }}>
         <h2 style={{ margin: "16px 0 8px" }}>{t("veh.parts_title")}</h2>
-        <Link href={`/vehicles/${id}/setup`} className="btn ghost">{t("veh.initial_link")}</Link>
       </div>
       <form action={saveRules}>
         <input type="hidden" name="vehicle_id" value={id} />

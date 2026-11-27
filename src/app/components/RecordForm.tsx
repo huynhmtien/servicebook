@@ -9,7 +9,7 @@ export interface RecordDefaults {
   vehicle_id?: number; garage?: string; date?: string | null; odo?: number | null; note?: string;
   draft_id?: number; slip_total?: number | null;
   discount?: number; vat?: number; vat_rate?: number | null; vat_included?: boolean; vat_inferred?: boolean;
-  items?: { raw_name: string; qty: number; amount: number; kind: string; part_type_id: number | null; how?: "memory" | "ai" | "keyword" | null; confidence?: number | null }[];
+  items?: { raw_name: string; qty: number; amount: number; kind: string; part_type_id: number | null; how?: "memory" | "ai" | "keyword" | null; confidence?: number | null; new_part?: { name: string; category: string } | null }[];
 }
 
 export default async function RecordForm({ d, blank = 3 }: { d: RecordDefaults; blank?: number }) {

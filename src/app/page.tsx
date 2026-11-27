@@ -23,13 +23,11 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     const health = computeHealth(rules, defects.map((d) => d.severity));
     return { v, rules, alerts, defects, health, avg: await vehicleAvgKmPerDay(v.id) };
   }));
-  const known = data.reduce((n, d) => n + d.rules.filter((r) => r.status !== "unknown").length, 0);
   const realRecords = (await get<{ n: number }>("SELECT COUNT(*) AS n FROM service_records WHERE COALESCE(note,'') <> ?", INITIAL_NOTE))?.n ?? 0;
 
   const steps = [
     { t: t("dash.step_prefs"), href: "/settings", done: settings.confirmed },
     { t: t("dash.step_vehicle"), href: "/vehicles", done: vehicles.length > 0 },
-    { t: t("dash.step_setup"), href: vehicles[0] ? `/vehicles/${vehicles[0].id}/setup` : "/vehicles", done: known > 0 },
     { t: t("dash.step_ai"), href: "/settings#keys", done: scanEnabled() },
     { t: t("dash.step_slip"), href: "/records/new", done: realRecords > 0 },
     { t: t("dash.step_telegram"), href: "/settings", done: telegramConfigured() },
@@ -98,7 +96,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                 <input name="km" inputMode="numeric" placeholder={t("dash.odo_placeholder")} aria-label={t("dash.odo_aria")} required />
                 <button type="submit">{t("common.update")}</button>
               </form>
-              {unknown > 0 && <div className="hh-note">{t("dash.coverage", { n: unknown })}<Link href={`/vehicles/${v.id}/setup`}>{t("dash.coverage_link")}</Link></div>}
+              {unknown > 0 && <div className="hh-note">{t("dash.coverage", { n: unknown })}<Link href="/records/new">{t("dash.coverage_link")}</Link></div>}
             </div>
 
             <div className="tiles">

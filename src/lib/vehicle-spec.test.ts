@@ -16,3 +16,12 @@ test("oneOf only accepts known values", () => {
   assert.equal(oneOf(FUELS, "Diesel"), "diesel");
   assert.equal(oneOf(FUELS, "kerosene"), null);
 });
+
+import { notApplicable } from "./vehicle-spec.ts";
+test("notApplicable follows fuel and gearbox", () => {
+  const m = notApplicable("diesel", "manual");
+  assert.ok(m.includes("spark_plugs") && m.includes("atf") && !m.includes("clutch") && !m.includes("glow_plugs"));
+  const a = notApplicable("petrol", "automatic");
+  assert.ok(a.includes("glow_plugs") && a.includes("clutch") && a.includes("flywheel") && !a.includes("atf"));
+  assert.deepEqual(notApplicable(null, null), []);
+});

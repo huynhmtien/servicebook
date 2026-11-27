@@ -67,3 +67,15 @@ test("normalizeDraft: VND (0 chữ số) giữ nguyên số nguyên", () => {
   assert.equal(d.items[0].amount, 800000);
   assert.equal(d.slip_total, 1263600);
 });
+
+import { normalizeNewPart, normalizeDraft as _nd } from "./extract.ts";
+test("new_part proposals need a name and a known non-cost category", () => {
+  assert.deepEqual(normalizeNewPart({ name: "  Mâm ly hợp ", category: "drivetrain" }), { name: "Mâm ly hợp", category: "drivetrain" });
+  assert.equal(normalizeNewPart({ name: "x", category: "drivetrain" }), null);
+  assert.equal(normalizeNewPart({ name: "Phí", category: "other_costs" }), null);
+  assert.equal(normalizeNewPart({ name: "Thing", category: "nope" }), null);
+  const d = _nd({ items: [{ raw_name: "LA BO AMAZA", qty: 1, amount: 2600000, kind: "part", part_type_id: null, confidence: 0.3, new_part: { name: "Bộ ly hợp", category: "drivetrain" } }] }, new Set([1]));
+  assert.equal(d.items[0].new_part?.name, "Bộ ly hợp");
+  const d2 = _nd({ items: [{ raw_name: "Dau", qty: 1, amount: 1, kind: "part", part_type_id: 1, confidence: 1, new_part: { name: "Bộ ly hợp", category: "drivetrain" } }] }, new Set([1]));
+  assert.equal(d2.items[0].new_part, null);
+});

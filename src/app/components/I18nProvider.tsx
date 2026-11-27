@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useMemo, type ReactNode } from "react";
-import { makeT, type T } from "../../lib/i18n/index.ts";
+import { makeT, type T } from "../../lib/i18n/make.ts";
 import type { Messages } from "../../lib/i18n/en.ts";
 import { makeFmt, type Fmt, type FmtOptions } from "../../lib/format.ts";
 
