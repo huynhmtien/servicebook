@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.0 — 2026-11-28
+- **Vehicle health on the dashboard**: a 0–100 score (ring + level) built from overdue / due-soon parts and open issues, per-part progress bars, quick actions, and a compact setup checklist. The whole UI was restyled (dark hero card, raised capture button, tighter vehicle page that hides parts with no data), light and dark, axe-clean.
+- **Exact vehicle variant**: new Gearbox, Engine and VIN fields; the web lookup of service intervals now sends make + model + year + fuel + gearbox + engine (diesel vs petrol and manual vs automatic differ). "Toyota" + "Fortuner" in separate fields are merged.
+- **Snap the registration / inspection paper** to fill the vehicle form (plate, make, model, year, fuel, engine, VIN). Nothing is saved until you confirm; the photo is discarded.
+- **Issue reports** (new *Issues* tab): photograph something abnormal, AI writes a short title/description/severity, saved with date and ODO; mark resolved; printable "garage report". Only these reports keep an image: a ~20–45 KB thumbnail. Slip, manual and registration scans are still read and discarded.
+- **Lighter uploads**: photos are always shrunk on the phone (≤1280 px JPEG, typically 80–300 KB) before upload. No web fonts or extra JS libraries.
+- Migration `0007` (adds columns + `defects` table; additive).
+
 ## 1.4.1 — 2026-11-23
 - **Layout fix on wide screens**: forms were laid out in an auto-fit grid that put labels, intro text and group headings into separate columns (misaligned fields, clipped select text). Forms are now one tidy column by default, with opt-in two-column rows for short paired fields. Settings page rebuilt: duplicate status rows removed (each key shows its own status), grouped sections, evenly sized action buttons. Receipt detail no longer leaves half the page empty.
 

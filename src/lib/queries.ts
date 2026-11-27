@@ -6,6 +6,7 @@ import type { DistanceUnit } from "./format.ts";
 
 export interface Vehicle {
   id: number; name: string; plate: string | null; model: string | null; year: number | null; odo: number; fuel: string | null;
+  transmission: string | null; engine: string | null; vin: string | null;
 }
 export interface PartType {
   id: number; key: string | null; name: string; category: string; default_km: number | null; default_months: number | null;
@@ -33,8 +34,8 @@ const NOT_APPLICABLE: Record<string, string[]> = {
 
 export async function createVehicle(v: Omit<Vehicle, "id">, opts: { distance: DistanceUnit } = { distance: "km" }): Promise<number> {
   const id = await insert(
-    "INSERT INTO vehicles (name, plate, model, year, odo, fuel) VALUES (?,?,?,?,?,?)",
-    v.name, v.plate, v.model, v.year, v.odo, v.fuel,
+    "INSERT INTO vehicles (name, plate, model, year, odo, fuel, transmission, engine, vin) VALUES (?,?,?,?,?,?,?,?,?)",
+    v.name, v.plate, v.model, v.year, v.odo, v.fuel, v.transmission, v.engine, v.vin,
   );
   // default intervals are in km; if using miles, convert and round to 500
   const km = opts.distance === "mi" ? "CAST(ROUND(default_km * 0.621371 / 500.0) * 500 AS INTEGER)" : "default_km";
@@ -135,3 +136,23 @@ export async function recordsFor(vehicleId?: number) {
     ...(vehicleId ? [vehicleId] : []),
   );
 }
+
+export interface Defect {
+  id: number; vehicle_id: number; vehicle: string; date: string; odo: number | null; title: string; description: string;
+  area: string | null; severity: "low" | "medium" | "high"; advice: string | null; user_note: string | null;
+  status: "open" | "resolved"; resolved_at: string | null; resolution: string | null; thumb: string | null; ai: number;
+}
+/** Listing leaves out the thumbnail (up to ~50 KB each) so list pages stay light; the detail/report pages load it. */
+export const listDefects = (opts: { vehicleId?: number; status?: "open" | "resolved" } = {}) =>
+  all<Omit<Defect, "thumb">>(
+    `SELECT d.id, d.vehicle_id, v.name AS vehicle, d.date, d.odo, d.title, d.description, d.area, d.severity, d.advice, d.user_note,
+            d.status, d.resolved_at, d.resolution, d.ai
+     FROM defects d JOIN vehicles v ON v.id = d.vehicle_id
+     WHERE 1=1 ${opts.vehicleId ? "AND d.vehicle_id = ?" : ""} ${opts.status ? "AND d.status = ?" : ""}
+     ORDER BY CASE d.severity WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END, d.date DESC, d.id DESC`,
+    ...(opts.vehicleId ? [opts.vehicleId] : []), ...(opts.status ? [opts.status] : []),
+  );
+export const getDefect = (id: number) =>
+  get<Defect>("SELECT d.*, v.name AS vehicle FROM defects d JOIN vehicles v ON v.id = d.vehicle_id WHERE d.id = ?", id);
+export const openDefectsWithThumb = (vehicleId: number) =>
+  all<Defect>("SELECT d.*, v.name AS vehicle FROM defects d JOIN vehicles v ON v.id = d.vehicle_id WHERE d.vehicle_id = ? AND d.status = 'open' ORDER BY CASE d.severity WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END, d.date, d.id", vehicleId);

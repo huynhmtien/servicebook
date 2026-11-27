@@ -18,8 +18,8 @@ export const viewport = {
   initialScale: 1,
   viewportFit: "cover" as const,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f2f2f7" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+    { media: "(prefers-color-scheme: light)", color: "#eef1f6" },
+    { media: "(prefers-color-scheme: dark)", color: "#070b14" },
   ],
 };
 export const dynamic = "force-dynamic";

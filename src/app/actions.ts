@@ -18,6 +18,8 @@ import { restoreBackup } from "../lib/backup.ts";
 import { KEY_FIELDS, validateKey } from "../lib/secret-crypto.ts";
 import { canStoreKeys, deleteSecret, loadSecrets, setSecret } from "../lib/secrets.ts";
 import { INITIAL_NOTE, normName, today } from "../lib/util.ts";
+import { FUELS, TRANSMISSIONS, oneOf, specDesc } from "../lib/vehicle-spec.ts";
+import { describeDefect, extractVehicle, SEVERITIES } from "../lib/vehicle-ai.ts";
 
 /** Redirect back with a one-off notice in the query string (a #fragment, if any, stays at the end of the URL). */
 const withNotice = (path: string, key: "ok" | "error", msg: string): never => {
@@ -48,10 +50,10 @@ export async function addVehicle(f: FormData) {
   const { t, settings } = await getI18n();
   const name = s(f, "name");
   if (!name) return;
-  const fuel = ["diesel", "petrol", "hybrid", "electric"].includes(s(f, "fuel")) ? s(f, "fuel") : null;
   const id = await createVehicle({
     name, plate: s(f, "plate") || null, model: s(f, "model") || null,
-    year: n(f, "year"), odo: n(f, "odo") ?? 0, fuel,
+    year: n(f, "year"), odo: n(f, "odo") ?? 0, fuel: oneOf(FUELS, s(f, "fuel")),
+    transmission: oneOf(TRANSMISSIONS, s(f, "transmission")), engine: s(f, "engine") || null, vin: s(f, "vin") || null,
   }, { distance: settings.distance });
   done(`/vehicles/${id}/setup`, t("act.vehicle_added"));
 }
@@ -69,8 +71,9 @@ export async function updateVehicle(f: FormData) {
   const name = s(f, "name");
   if (!name) return fail(`/vehicles/${id}`, t("act.name_required"));
   const odo = n(f, "odo");
-  await run("UPDATE vehicles SET name = ?, plate = ?, model = ?, year = ? WHERE id = ?",
-    name, s(f, "plate") || null, s(f, "model") || null, n(f, "year"), id);
+  await run("UPDATE vehicles SET name = ?, plate = ?, model = ?, year = ?, fuel = ?, transmission = ?, engine = ?, vin = ? WHERE id = ?",
+    name, s(f, "plate") || null, s(f, "model") || null, n(f, "year"), oneOf(FUELS, s(f, "fuel")),
+    oneOf(TRANSMISSIONS, s(f, "transmission")), s(f, "engine") || null, s(f, "vin") || null, id);
   const cur = await get<{ odo: number }>("SELECT odo FROM vehicles WHERE id = ?", id);
   if (odo != null && odo >= 0 && cur && odo !== cur.odo) await setOdo(id, odo, today(), true);
   await notifyEscalations();
@@ -118,7 +121,7 @@ export async function researchIntervalsAction(f: FormData) {
   const vid = Number(f.get("vehicle_id"));
   const v = await getVehicle(vid);
   if (!v) return fail("/vehicles", t("act.vehicle_not_found"));
-  if (!v.model && !v.year) return fail(`/vehicles/${vid}`, t("act.need_model_year"));
+  if (!v.model && !v.year && !v.name) return fail(`/vehicles/${vid}`, t("act.need_model_year"));
   let id: number;
   try {
     const p = await researchIntervals(v, aiContext(i18n));
@@ -429,4 +432,86 @@ export async function changePasswordAction(f: FormData) {
 export async function logout() {
   (await cookies()).delete(AUTH_COOKIE);
   redirect("/login");
+}
+
+
+// ---------- registration / inspection paper → vehicle fields (the image is read and discarded, never stored) ----------
+/** Read a photo of the registration / inspection certificate and send the user back to the form pre-filled (nothing is saved until they confirm). */
+export async function scanRegistration(f: FormData) {
+  const i18n = await getI18n();
+  const { t } = i18n;
+  const vid = Number(f.get("vehicle_id")) || 0;
+  const back = vid ? `/vehicles/${vid}` : "/vehicles";
+  if (!scanEnabled()) return fail(back, t("act.no_ai_key"));
+  const file = f.get("file");
+  if (!(file instanceof File) || file.size === 0) return fail(back, t("act.no_file"));
+  if (!supportedMime(file.type)) return fail(back, t("act.bad_mime"));
+  let reg: string;
+  try {
+    reg = encodeURIComponent(JSON.stringify(await extractVehicle(Buffer.from(await file.arrayBuffer()), file.type, aiContext(i18n))));
+  } catch (e) {
+    console.error("[servicebook] registration scan failed:", e);
+    return fail(back, t("act.reg_failed", { detail: e instanceof Error ? e.message : String(e) }).slice(0, 400));
+  }
+  redirect(`${back}?reg=${reg}${vid ? "#edit" : "#add"}`);
+}
+
+// ---------- defect / abnormality reports ----------
+const THUMB_RE = /^data:image\/(webp|jpeg);base64,[A-Za-z0-9+/=]+$/;
+
+/** Photo (+ optional note) → AI writes a short description → saved straight away with date and ODO. Only a tiny thumbnail is kept. */
+export async function createDefect(f: FormData) {
+  const i18n = await getI18n();
+  const { t } = i18n;
+  const vid = Number(f.get("vehicle_id"));
+  const v = await getVehicle(vid);
+  if (!v) return fail("/defects/new", t("act.vehicle_not_found"));
+  const note = s(f, "note").slice(0, 500);
+  const file = f.get("file");
+  const hasFile = file instanceof File && file.size > 0 && supportedMime(file.type);
+  const thumbRaw = s(f, "thumb");
+  const thumb = THUMB_RE.test(thumbRaw) && thumbRaw.length <= 90_000 ? thumbRaw : null;
+  if (!hasFile && !note) return fail("/defects/new", t("defects.need_input"));
+
+  let ai: Awaited<ReturnType<typeof describeDefect>> | null = null;
+  let aiError = "";
+  if (hasFile && scanEnabled()) {
+    try { ai = await describeDefect(Buffer.from(await (file as File).arrayBuffer()), (file as File).type, aiContext(i18n), specDesc(v), note); }
+    catch (e) { console.error("[servicebook] defect describe failed:", e); aiError = e instanceof Error ? e.message : String(e); }
+  }
+  const title = ai?.title ?? (note ? note.split(/[\n.]/)[0].slice(0, 80) : t("defects.untitled"));
+  const id = await insert(
+    "INSERT INTO defects (vehicle_id, date, odo, title, description, area, severity, advice, user_note, thumb, ai) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+    vid, today(), v.odo || null, title, ai?.description ?? note, ai?.area ?? null, ai?.severity ?? "medium", ai?.advice ?? null, note || null, thumb, ai ? 1 : 0,
+  );
+  revalidatePath("/", "layout");
+  const msg = ai ? t("defects.saved") : aiError ? t("defects.saved_ai_failed", { detail: aiError.slice(0, 160) }) : t("defects.saved_noai");
+  done(`/defects/${id}`, msg);
+}
+
+export async function updateDefect(f: FormData) {
+  const { t } = await getI18n();
+  const id = Number(f.get("id"));
+  const title = s(f, "title").slice(0, 120);
+  if (!title) return fail(`/defects/${id}`, t("defects.need_title"));
+  await run("UPDATE defects SET title = ?, description = ?, user_note = ?, severity = ? WHERE id = ?",
+    title, s(f, "description").slice(0, 800), s(f, "note").slice(0, 500) || null, oneOf(SEVERITIES, s(f, "severity")) ?? "medium", id);
+  revalidatePath("/", "layout");
+  done(`/defects/${id}`, t("defects.updated"));
+}
+
+export async function resolveDefect(f: FormData) {
+  const { t } = await getI18n();
+  const id = Number(f.get("id"));
+  if (f.get("reopen")) await run("UPDATE defects SET status = 'open', resolved_at = NULL, resolution = NULL WHERE id = ?", id);
+  else await run("UPDATE defects SET status = 'resolved', resolved_at = ?, resolution = ? WHERE id = ?", today(), s(f, "resolution").slice(0, 300) || null, id);
+  revalidatePath("/", "layout");
+  done(`/defects/${id}`, f.get("reopen") ? t("defects.reopened") : t("defects.resolved_msg"));
+}
+
+export async function deleteDefect(f: FormData) {
+  const { t } = await getI18n();
+  await run("DELETE FROM defects WHERE id = ?", Number(f.get("id")));
+  revalidatePath("/", "layout");
+  done("/defects", t("defects.deleted"));
 }

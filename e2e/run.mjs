@@ -45,7 +45,7 @@ if (process.env.APP_PASSWORD) {
 
 // A. Người dùng mới
 await go("/");
-check("Người dùng mới thấy checklist 'Bắt đầu nhanh'", (await txt("body")).includes("Bắt đầu nhanh"));
+check("Người dùng mới thấy checklist 'Hoàn tất cài đặt'", (await txt("body")).includes("Hoàn tất cài đặt"));
 await overflow("Tổng quan (trống)");
 
 // B. Thêm xe + dữ liệu ban đầu

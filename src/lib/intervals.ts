@@ -1,6 +1,7 @@
 import { all } from "./db.ts";
 import { COST_ONLY } from "./parts.ts";
 import { claudeCall, claudeText, geminiCall, parseJson, providerOrder, visionJson, type AiCtx, type Provider } from "./extract.ts";
+import { specDesc, type SpecInput } from "./vehicle-spec.ts";
 
 export interface IntervalItem {
   part_type_id: number; interval_km: number | null; interval_months: number | null;
@@ -59,7 +60,7 @@ function researchPrompt(desc: string, parts: { id: number; name: string }[], c: 
     `Report distances in ${c.unit} (convert if the source uses another unit). ` +
     `"confidence" = "high" only when quoted from the manufacturer's official document for this exact vehicle; "medium" for dealer/reputable sources; "low" when inferred or from a similar vehicle. ` +
     `If the manufacturer gives both normal and severe conditions (traffic, dust, bad roads, short trips) use the normal value as the main number and mention severe in "note". ` +
-    `Give each item the "source_url" of the page used. If the vehicle has several engine/gearbox variants and you don't know which one, say so in "caveats".`
+    `Give each item the "source_url" of the page used. The vehicle description above is the EXACT variant (fuel, gearbox, engine): use the schedule of THAT variant — diesel and petrol differ, and manual vs automatic gearboxes have different fluid intervals. Do not substitute another variant. If something about the variant is still unspecified (e.g. engine code, 2WD/4WD) and it changes the answer, say so in "caveats".`
   );
 }
 
@@ -93,10 +94,10 @@ async function searchGemini(prompt: string, shape: string): Promise<{ text: stri
 }
 
 /** Look up standard intervals for the vehicle model. The result is only a SUGGESTION — the user must confirm. */
-export async function researchIntervals(vehicle: { id: number; name: string; model: string | null; year: number | null }, ctx: AiCtx): Promise<IntervalProposal> {
+export async function researchIntervals(vehicle: { id: number } & SpecInput, ctx: AiCtx): Promise<IntervalProposal> {
   const providers = researchProviders();
   if (!providers.length) throw new Error(ctx.t("ai.research_needs_key"));
-  const desc = [vehicle.model || vehicle.name, vehicle.year ? `(${vehicle.year})` : ""].filter(Boolean).join(" ");
+  const desc = specDesc(vehicle);
   const parts = await trackedParts();
   const prompt = researchPrompt(desc, parts, ctx);
   const errors: string[] = [];

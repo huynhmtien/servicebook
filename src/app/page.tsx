@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { all, get } from "../lib/db.ts";
-import { listVehicles, vehicleRules, vehicleAvgKmPerDay } from "../lib/queries.ts";
+import { listVehicles, vehicleRules, vehicleAvgKmPerDay, listDefects } from "../lib/queries.ts";
+import { computeHealth } from "../lib/health.ts";
 import { telegramConfigured } from "../lib/telegram.ts";
 import { scanEnabled } from "../lib/extract.ts";
 import { INITIAL_NOTE, addMonths, today } from "../lib/util.ts";
 import { getI18n } from "../lib/settings.ts";
 import { partLabel } from "../lib/parts.ts";
-import { AlertItem, Flash } from "./components/ui";
+import { AlertItem, Flash, Ring } from "./components/ui";
 import Icon from "./components/Icon";
 import { updateOdo } from "./actions";
 
@@ -14,15 +15,15 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const { ok, error } = await searchParams;
   const { t, fmt, lang, settings } = await getI18n();
   const vehicles = await listVehicles();
+  const openDefects = await listDefects({ status: "open" });
   const data = await Promise.all(vehicles.map(async (v) => {
     const rules = (await vehicleRules(v.id)).filter((r) => r.enabled);
     const alerts = rules.filter((r) => r.status === "overdue" || r.status === "soon").sort((a, b) => a.urgency - b.urgency);
-    return { v, rules, alerts, avg: await vehicleAvgKmPerDay(v.id) };
+    const defects = openDefects.filter((d) => d.vehicle_id === v.id);
+    const health = computeHealth(rules, defects.map((d) => d.severity));
+    return { v, rules, alerts, defects, health, avg: await vehicleAvgKmPerDay(v.id) };
   }));
-  const overdue = data.flatMap((d) => d.alerts.filter((a) => a.status === "overdue").map((a) => ({ a, v: d.v })));
-  const soon = data.flatMap((d) => d.alerts.filter((a) => a.status === "soon").map((a) => ({ a, v: d.v })));
   const known = data.reduce((n, d) => n + d.rules.filter((r) => r.status !== "unknown").length, 0);
-  const unknown = data.reduce((n, d) => n + d.rules.filter((r) => r.status === "unknown" && (r.intervalKm != null || r.intervalMonths != null)).length, 0);
   const realRecords = (await get<{ n: number }>("SELECT COUNT(*) AS n FROM service_records WHERE COALESCE(note,'') <> ?", INITIAL_NOTE))?.n ?? 0;
 
   const steps = [
@@ -33,7 +34,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     { t: t("dash.step_slip"), href: "/records/new", done: realRecords > 0 },
     { t: t("dash.step_telegram"), href: "/settings", done: telegramConfigured() },
   ];
-  const onboarding = steps.some((s) => !s.done);
+  const doneSteps = steps.filter((s) => s.done).length;
+  const onboarding = doneSteps < steps.length;
 
   const todayStr = today();
   const from = addMonths(todayStr.slice(0, 8) + "01", -11);
@@ -43,11 +45,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const series = Array.from({ length: 12 }, (_, i) => addMonths(from, i).slice(0, 7)).map((m) => ({ m, total: monthly.find((x) => x.m === m)?.total ?? 0 }));
   const max = Math.max(1, ...series.map((s) => s.total));
   const year = series.reduce((a, b) => a + b.total, 0);
-
-  const heroKind = overdue.length ? "bad" : soon.length ? "warn" : "good";
-  const heroText = overdue.length
-    ? `${t("dash.hero_overdue", { count: overdue.length })}${soon.length ? t("dash.hero_soon_extra", { count: soon.length }) : ""}`
-    : soon.length ? t("dash.hero_soon", { count: soon.length }) : t("dash.hero_ok");
+  const curMonth = todayStr.slice(0, 7);
+  const sevIcon = { high: "alert", medium: "clock", low: "check" } as const;
 
   return (
     <>
@@ -58,8 +57,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       <Flash text={ok} ok />
 
       {onboarding && (
-        <div className="card">
-          <b>{t("dash.quickstart")}</b>
+        <details className="card">
+          <summary style={{ fontWeight: 700 }}>{t("dash.setup_progress", { done: doneSteps, total: steps.length })}</summary>
+          <div className="prog" aria-hidden="true"><i style={{ width: `${(doneSteps / steps.length) * 100}%` }} /></div>
           <div className="steps" style={{ marginTop: 12 }}>
             {steps.map((s, i) => (
               <div key={i} className={`step${s.done ? " done" : ""}`}>
@@ -68,51 +68,81 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
               </div>
             ))}
           </div>
-        </div>
+        </details>
       )}
+
+      {data.map(({ v, rules, alerts, defects, health, avg }) => {
+        const unknown = rules.filter((r) => r.status === "unknown" && (r.intervalKm != null || r.intervalMonths != null)).length;
+        const levelText = t(`dash.health_${health.level}` as const);
+        return (
+          <section key={v.id} aria-label={v.name}>
+            <div className={`hh ${health.level}`}>
+              <div className="hh-top">
+                <Ring score={health.score} aria={t("dash.score_aria", { n: health.score })} />
+                <div className="hh-info">
+                  <div className="hh-name">{v.name}</div>
+                  {v.plate && <span className="hh-plate">{v.plate}</span>}
+                  <div className="hh-level"><Icon n={health.level === "good" ? "check" : health.level === "watch" ? "clock" : "alert"} s={17} />{levelText}</div>
+                </div>
+              </div>
+              <div className="hh-odo"><b>{fmt.dist(v.odo)}</b><span>{t("dash.per_day", { n: fmt.num(avg), unit: fmt.unit })}</span></div>
+              <div className="hh-stats">
+                <a href="#focus" className={health.overdue ? "bad" : ""}><b>{health.overdue}</b><span>{t("dash.stat_overdue")}</span></a>
+                <a href="#focus" className={health.soon ? "warn" : ""}><b>{health.soon}</b><span>{t("dash.stat_soon")}</span></a>
+                <div className="good"><b>{health.ok}</b><span>{t("dash.stat_ok")}</span></div>
+                <Link href="/defects" className={health.openDefects ? "bad" : ""}><b>{health.openDefects}</b><span>{t("dash.stat_issues")}</span></Link>
+              </div>
+              <form action={updateOdo} className="hh-form">
+                <input type="hidden" name="vehicle_id" value={v.id} />
+                <input type="hidden" name="back" value="/" />
+                <input name="km" inputMode="numeric" placeholder={t("dash.odo_placeholder")} aria-label={t("dash.odo_aria")} required />
+                <button type="submit">{t("common.update")}</button>
+              </form>
+              {unknown > 0 && <div className="hh-note">{t("dash.coverage", { n: unknown })}<Link href={`/vehicles/${v.id}/setup`}>{t("dash.coverage_link")}</Link></div>}
+            </div>
+
+            <div className="tiles">
+              <Link href="/records/new" className="tile"><span className="ic"><Icon n="scan" s={22} /></span>{t("dash.action_scan")}</Link>
+              <Link href="/defects/new" className="tile warn"><span className="ic"><Icon n="alert" s={22} /></span>{t("dash.action_issue")}</Link>
+              <Link href="/compare" className="tile"><span className="ic"><Icon n="wallet" s={22} /></span>{t("dash.action_costs")}</Link>
+            </div>
+
+            <div className="sec" id="focus"><h2>{t("dash.focus")}</h2>{alerts.length > 5 && <Link href={`/vehicles/${v.id}`}>{t("dash.see_all")}</Link>}</div>
+            {alerts.length ? (
+              <div className="list">
+                {alerts.slice(0, 5).map((a) => <AlertItem key={a.ruleId} r={a} vehicle={vehicles.length > 1 ? v.name : undefined} t={t} fmt={fmt} partName={partLabel({ key: a.partKey, name: a.partName }, lang)} />)}
+              </div>
+            ) : <div className="card mute">{t("dash.focus_none")}</div>}
+
+            {defects.length > 0 && (
+              <>
+                <div className="sec"><h2>{t("dash.issues_open")}</h2><Link href="/defects">{t("dash.see_all")}</Link></div>
+                <div className="list">
+                  {defects.slice(0, 3).map((d) => (
+                    <Link key={d.id} href={`/defects/${d.id}`} className="li">
+                      <span className={`dotsev ${d.severity}`}><Icon n={sevIcon[d.severity]} s={20} /></span>
+                      <div className="grow"><div className="t">{d.title}</div><div className="mute">{fmt.date(d.date)}{d.odo ? ` · ${fmt.dist(d.odo)}` : ""}</div></div>
+                    </Link>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+        );
+      })}
 
       {vehicles.length > 0 && (
         <>
-          <div className={`hero ${heroKind}`}>
-            <Icon n={heroKind === "good" ? "check" : heroKind === "warn" ? "clock" : "alert"} s={30} />
-            <div>
-              <div className="big">{heroText}</div>
-              {unknown > 0 && heroKind === "good" && <div style={{ fontSize: 14 }}>{t("dash.unknown_hint", { count: unknown })}<Link href={`/vehicles/${vehicles[0].id}/setup`}>{t("dash.unknown_link")}</Link></div>}
-            </div>
-          </div>
-
-          {overdue.length + soon.length > 0 && (
-            <div className="list">
-              {[...overdue, ...soon].map(({ a, v }) => <AlertItem key={a.ruleId} r={a} vehicle={vehicles.length > 1 ? v.name : undefined} t={t} fmt={fmt} partName={partLabel({ key: a.partKey, name: a.partName }, lang)} />)}
-            </div>
-          )}
-
-          <h2>{t("dash.your_vehicles")}</h2>
-          <div className="grid">
-            {data.map(({ v, alerts, avg }) => (
-              <div className="card" key={v.id}>
-                <div className="row"><b style={{ fontSize: 18 }}>{v.name}</b><span className="sp" /><span className="mute">{v.plate}</span></div>
-                <div className="stat">{fmt.dist(v.odo)}</div>
-                <div className="mute">{t("dash.per_day", { n: fmt.num(avg), unit: fmt.unit })}{alerts.length ? t("dash.alerts_count", { count: alerts.length }) : ""}</div>
-                <form action={updateOdo} className="row" style={{ marginTop: 12, flexWrap: "nowrap" }}>
-                  <input type="hidden" name="vehicle_id" value={v.id} />
-                  <input type="hidden" name="back" value="/" />
-                  <input name="km" inputMode="numeric" placeholder={t("dash.odo_placeholder")} aria-label={t("dash.odo_aria")} style={{ flex: 1, minWidth: 0 }} required />
-                  <button type="submit">{t("common.update")}</button>
-                </form>
-              </div>
-            ))}
-          </div>
-
-          <h2>{t("dash.spend", { total: fmt.money(year) })}</h2>
+          <div className="sec"><h2>{t("dash.spend", { total: fmt.money(year) })}</h2><Link href="/compare">{t("dash.action_costs")}</Link></div>
           <div className="card">
             <div className="bars" role="img" aria-label={t("dash.spend_aria", { total: fmt.money(year) })}>
               {series.map((s) => (
-                <div key={s.m} title={`${s.m}: ${fmt.money(s.total)}`}>
+                <div key={s.m} title={`${s.m}: ${fmt.money(s.total)}`} className={s.m === curMonth ? "cur" : undefined}>
                   <i style={{ height: `${(s.total / max) * 100}%` }} /><span>{s.m.slice(5)}</span>
                 </div>
               ))}
             </div>
+            <div className="mute" style={{ marginTop: 10 }}>{t("dash.month_avg", { avg: fmt.money(Math.round(year / 12)) })}</div>
           </div>
         </>
       )}
