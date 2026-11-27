@@ -34,6 +34,8 @@ test("kiểm tra định dạng từng loại khóa", () => {
   assert.equal(validateKey("TELEGRAM_CHAT_ID", "@mychannel"), "@mychannel");
   assert.equal(validateKey("TELEGRAM_CHAT_ID", "abc"), null);
   assert.equal(validateKey("GEMINI_API_KEY", "AIzaSyExampleExampleExample12345"), "AIzaSyExampleExampleExample12345");
+  assert.equal(validateKey("GEMINI_API_KEY", "AQ.Ab8RN6ExampleExampleExample12345"), "AQ.Ab8RN6ExampleExampleExample12345"); // newer Gemini keys contain a dot
+  assert.equal(validateKey("GEMINI_API_KEY", "GEMINI_API_KEY=AIzaSyExampleExampleExample12345"), null);
   assert.equal(validateKey("GEMINI_API_KEY", "short"), null);
   assert.equal(validateKey("ANTHROPIC_API_KEY", "sk-ant-api03-abcdefghijklmnop"), "sk-ant-api03-abcdefghijklmnop");
   assert.equal(validateKey("ANTHROPIC_API_KEY", "AIzaSyExampleExampleExample12345"), null);

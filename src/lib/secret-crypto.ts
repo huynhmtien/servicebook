@@ -2,7 +2,7 @@
 
 /** Keys that can be entered in the app. `group` only affects how the Settings page lays them out. */
 export const KEY_FIELDS = [
-  { name: "GEMINI_API_KEY", group: "ai", valid: /^[\w-]{20,200}$/ },
+  { name: "GEMINI_API_KEY", group: "ai", valid: /^[\w.-]{20,200}$/ },
   { name: "ANTHROPIC_API_KEY", group: "ai", valid: /^sk-[\w-]{16,300}$/ },
   { name: "DEEPSEEK_API_KEY", group: "ai", valid: /^sk-[\w-]{16,300}$/ },
   { name: "TELEGRAM_BOT_TOKEN", group: "tg", valid: /^\d{5,}:[\w-]{20,100}$/ },
